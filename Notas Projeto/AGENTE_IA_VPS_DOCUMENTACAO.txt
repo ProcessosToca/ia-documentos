@@ -1,0 +1,994 @@
+
+# 📋 DOCUMENTAÇÃO COMPLETA - AGENTE IA PARA VPS
+
+## 🎯 VISÃO GERAL DO PROJETO
+
+Este documento fornece todas as informações necessárias para desenvolver um **Agente IA em Python** que rodará em uma **VPS externa** e se integrará com o sistema imobiliário **Toca Imóveis** através do **Supabase**.
+
+### 🔗 CONTEXTO DO SISTEMA
+- **Frontend**: React + TypeScript (já implementado)
+- **Backend**: Supabase (PostgreSQL + Edge Functions)
+- **Agente IA**: Python na VPS (a ser desenvolvido)
+- **Integração**: WhatsApp API + Supabase Database
+
+---
+
+## 🗄️ CONEXÃO COM SUPABASE
+
+### Dados de Conexão
+```python
+# Configurações do Supabase
+SUPABASE_URL = "https://rqyyoofuwrwwfcuxfjwu.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxeXlvb2Z1d3J3d2ZjdXhmand1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwODk2MjUsImV4cCI6MjA2NTY2NTYyNX0.lBOrYvRIGEhLLMgcaaooS9-w2M8VAZW_4rQYFxc6abE"
+PROJECT_ID = "rqyyoofuwrwwfcuxfjwu"
+```
+
+### Exemplo de Conexão Python
+```python
+from supabase import create_client, Client
+import os
+
+# Configurar cliente Supabase
+supabase_url = "https://rqyyoofuwrwwfcuxfjwu.supabase.co"
+supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxeXlvb2Z1d3J3d2ZjdXhmand1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwODk2MjUsImV4cCI6MjA2NTY2NTYyNX0.lBOrYvRIGEhLLMgcaaooS9-w2M8VAZW_4rQYFxc6abE"
+
+supabase: Client = create_client(supabase_url, supabase_key)
+
+# Teste de conexão
+def test_connection():
+    try:
+        result = supabase.table('ai_negotiations').select('*').limit(1).execute()
+        print("✅ Conexão com Supabase estabelecida com sucesso!")
+        return True
+    except Exception as e:
+        print(f"❌ Erro na conexão: {e}")
+        return False
+```
+
+---
+
+## 🗂️ ESTRUTURA DAS TABELAS DA IA
+
+### 1. TABELA: `ai_negotiations` (NEGOCIAÇÕES PRINCIPAIS)
+
+**Descrição**: Tabela principal que armazena cada negociação iniciada pela IA via WhatsApp.
+
+**Estrutura**:
+```sql
+CREATE TABLE ai_negotiations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_name TEXT NOT NULL,              -- Nome do cliente
+  client_phone TEXT NOT NULL,             -- Telefone do cliente (5514999999999)
+  client_email TEXT,                      -- Email do cliente (opcional)
+  property_id UUID REFERENCES properties(id), -- ID do imóvel de interesse
+  rental_modality rental_modality NOT NULL DEFAULT 'residencial', -- Tipo de locação
+  status ai_negotiation_status NOT NULL DEFAULT 'iniciada', -- Status da negociação
+  broker_id UUID REFERENCES system_users(id), -- ID do corretor responsável
+  started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), -- Quando iniciou
+  completed_at TIMESTAMP WITH TIME ZONE, -- Quando finalizou (se finalizou)
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  metadata JSONB DEFAULT '{}'::jsonb      -- Dados extras em JSON
+);
+```
+
+**Enums Importantes**:
+```sql
+-- Status possíveis da negociação
+CREATE TYPE ai_negotiation_status AS ENUM (
+  'iniciada',               -- Negociação recém iniciada
+  'coletando_documentos',   -- IA está coletando documentos
+  'documentos_pendentes',   -- Aguardando documentos do cliente
+  'documentos_validados',   -- Documentos foram validados
+  'aguardando_corretor',    -- Corretor precisa agir
+  'finalizada',             -- Negociação concluída
+  'cancelada'               -- Negociação cancelada
+);
+
+-- Modalidades de locação
+CREATE TYPE rental_modality AS ENUM (
+  'residencial',  -- Residencial
+  'comercial',    -- Comercial
+  'temporada',    -- Temporada
+  'estudantil'    -- Estudantil
+);
+```
+
+**Exemplo de Uso Python**:
+```python
+# Criar nova negociação
+def criar_negociacao(client_name, client_phone, property_id=None):
+    data = {
+        "client_name": client_name,
+        "client_phone": client_phone,
+        "rental_modality": "residencial",
+        "status": "iniciada"
+    }
+    
+    if property_id:
+        data["property_id"] = property_id
+    
+    result = supabase.table('ai_negotiations').insert(data).execute()
+    return result.data[0] if result.data else None
+
+# Atualizar status da negociação
+def atualizar_status_negociacao(negotiation_id, novo_status):
+    result = supabase.table('ai_negotiations').update({
+        "status": novo_status,
+        "updated_at": "now()"
+    }).eq('id', negotiation_id).execute()
+    return result.data
+```
+
+---
+
+### 2. TABELA: `ai_conversations` (CONVERSAS)
+
+**Descrição**: Armazena todas as mensagens trocadas entre IA, cliente e corretor.
+
+**Estrutura**:
+```sql
+CREATE TABLE ai_conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  negotiation_id UUID NOT NULL REFERENCES ai_negotiations(id) ON DELETE CASCADE,
+  conversation_type conversation_type NOT NULL, -- Tipo de conversa
+  sender TEXT NOT NULL,                   -- Quem enviou: 'ia', 'cliente', 'corretor'
+  message TEXT NOT NULL,                  -- Conteúdo da mensagem
+  timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  metadata JSONB DEFAULT '{}'::jsonb      -- Dados extras
+);
+```
+
+**Enum do Tipo de Conversa**:
+```sql
+CREATE TYPE conversation_type AS ENUM (
+  'ia_cliente',   -- Conversa entre IA e Cliente
+  'ia_corretor'   -- Conversa entre IA e Corretor
+);
+```
+
+**Exemplo de Uso Python**:
+```python
+# Salvar mensagem na conversa
+def salvar_mensagem(negotiation_id, sender, message, conversation_type="ia_cliente"):
+    data = {
+        "negotiation_id": negotiation_id,
+        "conversation_type": conversation_type,
+        "sender": sender,  # 'ia', 'cliente', 'corretor'
+        "message": message
+    }
+    
+    result = supabase.table('ai_conversations').insert(data).execute()
+    return result.data[0] if result.data else None
+
+# Buscar histórico de conversa
+def buscar_historico_conversa(negotiation_id, conversation_type="ia_cliente"):
+    result = supabase.table('ai_conversations').select('*').eq(
+        'negotiation_id', negotiation_id
+    ).eq('conversation_type', conversation_type).order('timestamp').execute()
+    return result.data
+```
+
+---
+
+### 3. TABELA: `ai_document_types` (TIPOS DE DOCUMENTOS)
+
+**Descrição**: Define os tipos de documentos que podem ser solicitados pelo sistema.
+
+**Estrutura**:
+```sql
+CREATE TABLE ai_document_types (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,              -- Nome do documento
+  description TEXT,                       -- Descrição
+  required BOOLEAN NOT NULL DEFAULT true, -- Se é obrigatório
+  validation_rules JSONB DEFAULT '{}'::jsonb, -- Regras de validação
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+```
+
+**Tipos Padrão Já Cadastrados**:
+```python
+TIPOS_DOCUMENTOS_PADRAO = [
+    {
+        "name": "RG",
+        "description": "Documento de identidade",
+        "required": True
+    },
+    {
+        "name": "CPF", 
+        "description": "Cadastro de Pessoa Física",
+        "required": True
+    },
+    {
+        "name": "Comprovante de Renda",
+        "description": "Últimos 3 holerites ou declaração de renda",
+        "required": True
+    },
+    {
+        "name": "Comprovante de Residência",
+        "description": "Conta de luz, água ou telefone",
+        "required": True
+    },
+    {
+        "name": "Certidão de Nascimento/Casamento",
+        "description": "Estado civil",
+        "required": False
+    },
+    {
+        "name": "Referências Comerciais",
+        "description": "Contatos de referência",
+        "required": False
+    }
+]
+```
+
+**Exemplo de Uso Python**:
+```python
+# Buscar tipos de documentos obrigatórios
+def buscar_documentos_obrigatorios():
+    result = supabase.table('ai_document_types').select('*').eq(
+        'required', True
+    ).eq('is_active', True).execute()
+    return result.data
+```
+
+---
+
+### 4. TABELA: `ai_documents` (DOCUMENTOS ENVIADOS)
+
+**Descrição**: Armazena os documentos enviados pelos clientes durante a negociação.
+
+**Estrutura**:
+```sql
+CREATE TABLE ai_documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  negotiation_id UUID NOT NULL REFERENCES ai_negotiations(id) ON DELETE CASCADE,
+  document_type_id UUID NOT NULL REFERENCES ai_document_types(id),
+  file_name TEXT NOT NULL,               -- Nome do arquivo
+  file_path TEXT NOT NULL,               -- Caminho no storage
+  file_size INTEGER,                     -- Tamanho do arquivo
+  mime_type TEXT,                        -- Tipo MIME
+  status document_status NOT NULL DEFAULT 'pendente', -- Status do documento
+  validation_result JSONB DEFAULT '{}'::jsonb, -- Resultado da validação
+  uploaded_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  validated_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+```
+
+**Enum de Status dos Documentos**:
+```sql
+CREATE TYPE document_status AS ENUM (
+  'pendente',   -- Aguardando recebimento
+  'recebido',   -- Documento recebido
+  'validando',  -- Em processo de validação
+  'validado',   -- Validado com sucesso
+  'erro',       -- Erro no processamento
+  'rejeitado'   -- Rejeitado
+);
+```
+
+**Exemplo de Uso Python**:
+```python
+# Salvar documento recebido
+def salvar_documento(negotiation_id, document_type_id, file_name, file_path, file_size, mime_type):
+    data = {
+        "negotiation_id": negotiation_id,
+        "document_type_id": document_type_id,
+        "file_name": file_name,
+        "file_path": file_path,
+        "file_size": file_size,
+        "mime_type": mime_type,
+        "status": "recebido"
+    }
+    
+    result = supabase.table('ai_documents').insert(data).execute()
+    return result.data[0] if result.data else None
+
+# Atualizar status do documento
+def atualizar_status_documento(document_id, status, validation_result=None):
+    data = {"status": status}
+    if validation_result:
+        data["validation_result"] = validation_result
+    if status == "validado":
+        data["validated_at"] = "now()"
+    
+    result = supabase.table('ai_documents').update(data).eq('id', document_id).execute()
+    return result.data
+```
+
+---
+
+## 💾 STORAGE - ARMAZENAMENTO DE DOCUMENTOS
+
+### Bucket de Documentos
+- **Nome do Bucket**: `ai-negotiations`
+- **Público**: Não (privado)
+- **Finalidade**: Armazenar documentos enviados pelos clientes
+
+### Exemplo de Upload Python:
+```python
+def upload_documento(file_path, negotiation_id, document_name):
+    """
+    Faz upload de documento para o Supabase Storage
+    """
+    try:
+        # Gerar nome único para o arquivo
+        import uuid
+        from datetime import datetime
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_filename = f"{negotiation_id}/{timestamp}_{document_name}"
+        
+        # Upload para o bucket
+        with open(file_path, 'rb') as file:
+            result = supabase.storage.from_('ai-negotiations').upload(
+                path=unique_filename,
+                file=file,
+                file_options={"content-type": "application/pdf"}  # Ajustar conforme tipo
+            )
+        
+        if result.error:
+            print(f"❌ Erro no upload: {result.error}")
+            return None
+        
+        # Obter URL pública (se necessário)
+        public_url = supabase.storage.from_('ai-negotiations').get_public_url(unique_filename)
+        
+        return {
+            "file_path": unique_filename,
+            "public_url": public_url
+        }
+        
+    except Exception as e:
+        print(f"❌ Erro no upload: {e}")
+        return None
+```
+
+---
+
+## 🏠 TABELA DE PROPRIEDADES (REFERÊNCIA)
+
+### Estrutura da Tabela `properties`:
+```sql
+CREATE TABLE properties (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,                    -- Título do imóvel
+  description TEXT,                       -- Descrição
+  property_type property_type NOT NULL,   -- Tipo: 'casa', 'apartamento', etc.
+  price NUMERIC NOT NULL,                 -- Preço
+  address TEXT NOT NULL,                  -- Endereço
+  neighborhood TEXT NOT NULL,             -- Bairro
+  city TEXT NOT NULL DEFAULT 'Marília',   -- Cidade
+  state TEXT NOT NULL DEFAULT 'SP',       -- Estado
+  zip_code TEXT,                          -- CEP
+  bedrooms INTEGER NOT NULL DEFAULT 0,    -- Quartos
+  bathrooms INTEGER NOT NULL DEFAULT 0,   -- Banheiros
+  area_sqm INTEGER NOT NULL,              -- Área em m²
+  parking_spaces INTEGER NOT NULL DEFAULT 0, -- Vagas de garagem
+  status property_status NOT NULL DEFAULT 'disponivel', -- Status
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  is_featured BOOLEAN NOT NULL DEFAULT false,
+  amenities JSONB DEFAULT '[]'::jsonb,    -- Comodidades
+  latitude NUMERIC,                       -- Latitude
+  longitude NUMERIC,                      -- Longitude
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+```
+
+**Exemplo de Busca de Imóveis**:
+```python
+# Buscar imóveis disponíveis
+def buscar_imoveis_disponiveis(limite=10):
+    result = supabase.table('properties').select('*').eq(
+        'status', 'disponivel'
+    ).eq('is_active', True).limit(limite).execute()
+    return result.data
+
+# Buscar imóvel específico
+def buscar_imovel_por_id(property_id):
+    result = supabase.table('properties').select('*').eq('id', property_id).execute()
+    return result.data[0] if result.data else None
+```
+
+---
+
+## 👥 TABELA DE USUÁRIOS DO SISTEMA
+
+### Estrutura da Tabela `system_users`:
+```sql
+CREATE TABLE system_users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username TEXT NOT NULL,                 -- Nome de usuário
+  email TEXT NOT NULL,                    -- Email
+  full_name TEXT,                         -- Nome completo
+  role TEXT NOT NULL DEFAULT 'editor',    -- Papel: 'admin', 'editor'
+  sector_id UUID REFERENCES company_sectors(id), -- Setor da empresa
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+```
+
+**Exemplo de Busca de Corretores**:
+```python
+# Buscar corretores ativos
+def buscar_corretores():
+    result = supabase.table('system_users').select('*').eq('is_active', True).execute()
+    return result.data
+
+# Atribuir corretor a negociação
+def atribuir_corretor(negotiation_id, broker_id):
+    result = supabase.table('ai_negotiations').update({
+        "broker_id": broker_id,
+        "status": "aguardando_corretor"
+    }).eq('id', negotiation_id).execute()
+    return result.data
+```
+
+---
+
+## 🔄 FLUXO DE TRABALHO DA IA
+
+### 1. RECEBIMENTO DE MENSAGEM WHATSAPP
+```python
+def processar_mensagem_whatsapp(phone_number, message_text, sender_name):
+    """
+    Processa mensagem recebida via WhatsApp
+    """
+    try:
+        # 1. Verificar se já existe negociação ativa para este número
+        negotiation = buscar_negociacao_ativa(phone_number)
+        
+        if not negotiation:
+            # 2. Criar nova negociação
+            negotiation = criar_negociacao(
+                client_name=sender_name,
+                client_phone=phone_number
+            )
+            
+            # 3. Salvar mensagem inicial
+            salvar_mensagem(
+                negotiation_id=negotiation['id'],
+                sender='cliente',
+                message=message_text
+            )
+            
+            # 4. Processar intenção inicial
+            response = processar_intencao_inicial(message_text)
+            
+        else:
+            # 5. Continuar conversa existente
+            salvar_mensagem(
+                negotiation_id=negotiation['id'],
+                sender='cliente',
+                message=message_text
+            )
+            
+            response = processar_conversa_existente(negotiation, message_text)
+        
+        # 6. Salvar resposta da IA
+        salvar_mensagem(
+            negotiation_id=negotiation['id'],
+            sender='ia',
+            message=response
+        )
+        
+        # 7. Enviar resposta via WhatsApp
+        enviar_mensagem_whatsapp(phone_number, response)
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Erro ao processar mensagem: {e}")
+        return False
+```
+
+### 2. CLASSIFICAÇÃO DE INTENÇÕES
+```python
+def processar_intencao_inicial(message_text):
+    """
+    Classifica a intenção inicial do cliente
+    """
+    intencoes = {
+        'buscar_imovel': ['quero alugar', 'procuro casa', 'apartamento', 'imóvel'],
+        'informacoes': ['informação', 'preço', 'valor', 'quanto custa'],
+        'visita': ['visita', 'ver', 'conhecer', 'agendar'],
+        'documentos': ['documento', 'papel', 'contrato']
+    }
+    
+    message_lower = message_text.lower()
+    
+    for intencao, palavras_chave in intencoes.items():
+        if any(palavra in message_lower for palavra in palavras_chave):
+            return gerar_resposta_por_intencao(intencao)
+    
+    # Resposta genérica
+    return """
+    Olá! 👋 
+    
+    Sou a assistente virtual da Toca Imóveis! 
+    
+    Posso te ajudar com:
+    🏠 Buscar imóveis para aluguel
+    📋 Informações sobre documentação
+    📅 Agendar visitas
+    💰 Consultar preços e condições
+    
+    Como posso te ajudar hoje?
+    """
+```
+
+### 3. COLETA DE DOCUMENTOS
+```python
+def iniciar_coleta_documentos(negotiation_id):
+    """
+    Inicia processo de coleta de documentos
+    """
+    # Atualizar status da negociação
+    atualizar_status_negociacao(negotiation_id, 'coletando_documentos')
+    
+    # Buscar documentos obrigatórios
+    documentos_obrigatorios = buscar_documentos_obrigatorios()
+    
+    # Gerar lista de documentos necessários
+    lista_documentos = []
+    for doc in documentos_obrigatorios:
+        lista_documentos.append(f"📄 {doc['name']} - {doc['description']}")
+    
+    response = f"""
+    📋 **DOCUMENTOS NECESSÁRIOS**
+    
+    Para prosseguir com a locação, preciso dos seguintes documentos:
+    
+    {chr(10).join(lista_documentos)}
+    
+    Você pode enviar os documentos por aqui mesmo! 
+    
+    Pode ser:
+    📷 Foto do documento
+    📄 PDF digitalizado
+    🖼️ Imagem clara e legível
+    
+    Vou te ajudar com cada documento. Vamos começar?
+    """
+    
+    return response
+```
+
+### 4. VALIDAÇÃO DE DOCUMENTOS
+```python
+def processar_documento_recebido(negotiation_id, file_path, file_name):
+    """
+    Processa documento recebido do cliente
+    """
+    try:
+        # 1. Identificar tipo de documento (usando IA/OCR)
+        document_type = identificar_tipo_documento(file_path)
+        
+        if not document_type:
+            return "❌ Não consegui identificar o tipo de documento. Pode me dizer qual documento é este?"
+        
+        # 2. Fazer upload para o storage
+        upload_result = upload_documento(file_path, negotiation_id, file_name)
+        
+        if not upload_result:
+            return "❌ Erro ao salvar documento. Tente enviar novamente."
+        
+        # 3. Salvar no banco de dados
+        document_type_id = buscar_document_type_id(document_type)
+        
+        doc_record = salvar_documento(
+            negotiation_id=negotiation_id,
+            document_type_id=document_type_id,
+            file_name=file_name,
+            file_path=upload_result['file_path'],
+            file_size=os.path.getsize(file_path),
+            mime_type=get_mime_type(file_path)
+        )
+        
+        # 4. Validar documento (usando IA)
+        validation_result = validar_documento(file_path, document_type)
+        
+        if validation_result['valid']:
+            atualizar_status_documento(doc_record['id'], 'validado', validation_result)
+            response = f"✅ {document_type} recebido e validado com sucesso!"
+        else:
+            atualizar_status_documento(doc_record['id'], 'rejeitado', validation_result)
+            response = f"❌ Problema com {document_type}: {validation_result['error']}"
+        
+        # 5. Verificar se todos os documentos foram enviados
+        verificar_documentos_completos(negotiation_id)
+        
+        return response
+        
+    except Exception as e:
+        print(f"❌ Erro ao processar documento: {e}")
+        return "❌ Erro ao processar documento. Tente novamente."
+```
+
+---
+
+## 📱 INTEGRAÇÃO COM WHATSAPP
+
+### Webhook para Receber Mensagens
+```python
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+@app.route('/webhook/whatsapp', methods=['POST'])
+def webhook_whatsapp():
+    """
+    Webhook para receber mensagens do WhatsApp
+    """
+    try:
+        data = request.json
+        
+        # Estrutura típica do webhook WhatsApp
+        if 'messages' in data:
+            for message in data['messages']:
+                phone = message.get('key', {}).get('remoteJid', '').replace('@s.whatsapp.net', '')
+                text = message.get('message', {}).get('conversation', '')
+                sender_name = message.get('pushName', 'Cliente')
+                
+                if phone and text:
+                    # Processar mensagem
+                    processar_mensagem_whatsapp(phone, text, sender_name)
+        
+        return jsonify({"status": "success"}), 200
+        
+    except Exception as e:
+        print(f"❌ Erro no webhook: {e}")
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080)
+```
+
+### Enviar Mensagens via WhatsApp API
+```python
+import requests
+
+def enviar_mensagem_whatsapp(phone_number, message):
+    """
+    Envia mensagem via WhatsApp API
+    """
+    try:
+        # Configurações da API (ajustar conforme seu provedor)
+        api_url = "https://api.whatsapp.com/send"  # URL da sua API
+        api_token = "SEU_TOKEN_AQUI"  # Token da API
+        
+        headers = {
+            'Authorization': f'Bearer {api_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        data = {
+            'phone': phone_number,
+            'message': message
+        }
+        
+        response = requests.post(api_url, headers=headers, json=data)
+        
+        if response.status_code == 200:
+            print(f"✅ Mensagem enviada para {phone_number}")
+            return True
+        else:
+            print(f"❌ Erro ao enviar mensagem: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Erro ao enviar mensagem: {e}")
+        return False
+```
+
+---
+
+## 🎯 TELA "IA - NEGOCIAÇÕES" (CONTEXTO FRONTEND)
+
+### O que a Tela Mostra
+A tela **"IA - Negociações"** (`/hub/ia-negociacoes`) exibe:
+
+1. **Cards de Estatísticas**:
+   - Total de negociações
+   - Negociações em andamento
+   - Documentos pendentes
+   - Negociações finalizadas
+
+2. **Lista de Negociações**:
+   - Nome do cliente e telefone
+   - Status atual da negociação
+   - Imóvel de interesse (se houver)
+   - Data de início
+   - Corretor responsável
+
+3. **Modal de Detalhes**:
+   - **Aba Conversas**: Histórico de mensagens IA ↔ Cliente e IA ↔ Corretor
+   - **Aba Documentos**: Status de cada documento solicitado
+   - **Aba Timeline**: Linha do tempo da negociação
+
+### Dados Esperados pela Tela
+```python
+# Exemplo de dados que a tela consome
+def obter_dados_para_dashboard():
+    """
+    Retorna dados formatados para o dashboard
+    """
+    # Buscar negociações com informações relacionadas
+    negotiations = supabase.table('ai_negotiations').select("""
+        *,
+        property:properties(title, address),
+        broker:system_users(full_name, username)
+    """).order('created_at', desc=True).execute()
+    
+    # Estatísticas
+    stats = {
+        'total': len(negotiations.data),
+        'active': len([n for n in negotiations.data if n['status'] not in ['finalizada', 'cancelada']]),
+        'completed': len([n for n in negotiations.data if n['status'] == 'finalizada']),
+        'pending_docs': len([n for n in negotiations.data if n['status'] == 'documentos_pendentes'])
+    }
+    
+    return {
+        'negotiations': negotiations.data,
+        'stats': stats
+    }
+```
+
+---
+
+## 🚀 EXEMPLO DE IMPLEMENTAÇÃO COMPLETA
+
+### Estrutura do Projeto Python
+```
+ai_agent_vps/
+├── main.py                 # Aplicação principal
+├── models/
+│   ├── supabase_client.py  # Cliente Supabase
+│   ├── negotiations.py     # Modelo de negociações
+│   ├── documents.py        # Modelo de documentos
+│   └── conversations.py    # Modelo de conversas
+├── services/
+│   ├── whatsapp_service.py # Serviço WhatsApp
+│   ├── ai_service.py       # Serviço de IA
+│   └── document_service.py # Processamento de documentos
+├── utils/
+│   ├── validators.py       # Validadores
+│   └── helpers.py          # Funções auxiliares
+└── requirements.txt        # Dependências
+```
+
+### requirements.txt
+```
+supabase==2.3.4
+flask==3.0.0
+requests==2.31.0
+python-dotenv==1.0.0
+openai==1.12.0
+python-magic==0.4.27
+pillow==10.2.0
+pytesseract==0.3.10
+```
+
+### Exemplo de Classe Principal
+```python
+# main.py
+from flask import Flask
+from models.supabase_client import SupabaseClient
+from services.whatsapp_service import WhatsAppService
+from services.ai_service import AIService
+
+class AgentIA:
+    def __init__(self):
+        self.supabase = SupabaseClient()
+        self.whatsapp = WhatsAppService()
+        self.ai = AIService()
+        
+    def processar_mensagem(self, phone, message, sender_name):
+        """Método principal para processar mensagens"""
+        # Implementar lógica completa aqui
+        pass
+        
+    def iniciar_servidor(self):
+        """Inicia servidor Flask"""
+        app = Flask(__name__)
+        
+        @app.route('/webhook/whatsapp', methods=['POST'])
+        def webhook():
+            # Implementar webhook
+            pass
+            
+        app.run(host='0.0.0.0', port=8080)
+
+if __name__ == "__main__":
+    agent = AgentIA()
+    agent.iniciar_servidor()
+```
+
+---
+
+## 🔧 CONFIGURAÇÕES NECESSÁRIAS
+
+### Variáveis de Ambiente
+```bash
+# .env
+SUPABASE_URL=https://rqyyoofuwrwwfcuxfjwu.supabase.co
+SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxeXlvb2Z1d3J3d2ZjdXhmand1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwODk2MjUsImV4cCI6MjA2NTY2NTYyNX0.lBOrYvRIGEhLLMgcaaooS9-w2M8VAZW_4rQYFxc6abE
+WHATSAPP_API_TOKEN=seu_token_whatsapp
+OPENAI_API_KEY=sua_chave_openai
+```
+
+### Instalação no Servidor VPS
+```bash
+# Instalar dependências do sistema
+sudo apt update
+sudo apt install python3 python3-pip nginx
+
+# Clonar projeto
+git clone [seu-repositorio]
+cd ai_agent_vps
+
+# Criar ambiente virtual
+python3 -m venv venv
+source venv/bin/activate
+
+# Instalar dependências Python
+pip install -r requirements.txt
+
+# Configurar variáveis de ambiente
+cp .env.example .env
+nano .env  # Editar com suas credenciais
+
+# Executar aplicação
+python main.py
+```
+
+---
+
+## 📊 MONITORAMENTO E LOGS
+
+### Logs Importantes para Implementar
+```python
+import logging
+
+# Configurar logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('ai_agent.log'),
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+# Exemplos de logs
+logger.info(f"🤖 Nova negociação iniciada: {negotiation_id}")
+logger.info(f"📄 Documento recebido: {document_type}")
+logger.error(f"❌ Erro ao processar mensagem: {error}")
+logger.warning(f"⚠️ Documento rejeitado: {rejection_reason}")
+```
+
+### Métricas para Acompanhar
+```python
+def obter_metricas_diarias():
+    """
+    Gera métricas diárias do agente IA
+    """
+    from datetime import datetime, timedelta
+    
+    hoje = datetime.now().date()
+    ontem = hoje - timedelta(days=1)
+    
+    # Negociações iniciadas hoje
+    negociacoes_hoje = supabase.table('ai_negotiations').select('*').gte(
+        'created_at', f'{hoje}T00:00:00'
+    ).execute()
+    
+    # Documentos processados hoje
+    documentos_hoje = supabase.table('ai_documents').select('*').gte(
+        'uploaded_at', f'{hoje}T00:00:00'
+    ).execute()
+    
+    # Conversas hoje
+    conversas_hoje = supabase.table('ai_conversations').select('*').gte(
+        'timestamp', f'{hoje}T00:00:00'
+    ).execute()
+    
+    return {
+        'negociacoes_iniciadas': len(negociacoes_hoje.data),
+        'documentos_processados': len(documentos_hoje.data),
+        'mensagens_trocadas': len(conversas_hoje.data),
+        'data': hoje.isoformat()
+    }
+```
+
+---
+
+## 🎯 PONTOS IMPORTANTES PARA O DESENVOLVEDOR
+
+### 1. Segurança
+- **NUNCA** exponha as chaves da API diretamente no código
+- Use variáveis de ambiente para credenciais
+- Valide todas as entradas do usuário
+- Implemente rate limiting para evitar spam
+
+### 2. Performance
+- Use connection pooling para o banco de dados
+- Implemente cache para consultas frequentes
+- Processe documentos de forma assíncrona
+- Monitore o uso de recursos da VPS
+
+### 3. Escalabilidade
+- Prepare para múltiplas conversas simultâneas
+- Use filas para processar documentos
+- Implemente logs estruturados
+- Monitore métricas de performance
+
+### 4. Backup e Recuperação
+- Faça backup regular dos logs
+- Monitore falhas de conexão com Supabase
+- Implemente retry automático para operações críticas
+- Tenha um plano de recuperação de desastres
+
+---
+
+## 📞 SUPORTE E CONTATOS
+
+### Recursos de Desenvolvimento
+- **Supabase Dashboard**: https://supabase.com/dashboard/project/rqyyoofuwrwwfcuxfjwu
+- **Documentação Supabase Python**: https://supabase.com/docs/reference/python
+- **API Reference**: https://supabase.com/docs/guides/api
+
+### Comandos Úteis para Debug
+```bash
+# Verificar logs em tempo real
+tail -f ai_agent.log
+
+# Testar conexão com Supabase
+python -c "from models.supabase_client import SupabaseClient; client = SupabaseClient(); print('Conexão OK' if client.test_connection() else 'Erro na conexão')"
+
+# Verificar status do servidor
+curl -X GET http://localhost:8080/health
+
+# Monitorar recursos do sistema
+htop
+```
+
+---
+
+## 🚀 PRÓXIMOS PASSOS
+
+### Desenvolvimento Fase 1 (Básico)
+- [ ] Configurar ambiente Python na VPS
+- [ ] Implementar conexão com Supabase
+- [ ] Criar webhook WhatsApp básico
+- [ ] Implementar CRUD das negociações
+- [ ] Testes básicos de integração
+
+### Desenvolvimento Fase 2 (IA)
+- [ ] Integrar OpenAI para processamento de linguagem natural
+- [ ] Implementar classificação de intenções
+- [ ] Criar fluxo de coleta de documentos
+- [ ] Implementar validação automática de documentos
+- [ ] Sistema de notificações para corretores
+
+
+
+---
+
+**📝 ÚLTIMA ATUALIZAÇÃO**: Juno 2025  
+**🔄 VERSÃO**: 1.0  
+**👤 DESENVOLVEDOR**: [Vinicius) 
+
+---
+
+> **⚠️ IMPORTANTE**: Este documento deve ser atualizado sempre que houver mudanças na estrutura do banco de dados ou nos fluxos de negociação. Mantenha sempre sincronizado com o código em produção.
+
+**📧 DÚVIDAS?** Entre em contato com a equipe de desenvolvimento do sistema principal.

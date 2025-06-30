@@ -1,0 +1,3 @@
+pip install supabase python-dotenv
+
+ngrok http 8000 --domain=iatocaloc.ngrok.app
