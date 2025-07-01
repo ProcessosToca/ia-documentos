@@ -8,6 +8,11 @@ Funcionalidades nesta versão:
 - ✅ Receber mensagens via webhook
 - ✅ Processar solicitações de locação
 - ✅ Integração com W-API do WhatsApp
+- ✅ Diferenciação entre colaboradores e clientes
+- ✅ Menus interativos para colaboradores
+- ✅ Processamento de respostas de menu (listResponseMessage)
+
+NOVO v2.0: Sistema agora processa tanto mensagens de texto quanto respostas de menu
 """
 
 import os
@@ -88,22 +93,64 @@ async def webhook_whatsapp(request: Request):
             message_id = mensagem_processada.get("message_id")
             nome_remetente = mensagem_processada.get("nome_remetente", "")
             
-            logger.info(f"💬 Mensagem de {nome_remetente}: {texto_mensagem}")
+            # NOVA LÓGICA: VERIFICAR SE É RESPOSTA DE MENU
+            # ==============================================
             
-            # Interpretar mensagem do usuário com IA
-            resultado = whatsapp_service.interpretar_mensagem_usuario(remetente, texto_mensagem, message_id)
+            # Extrair dados de resposta de menu se existir
+            msg_content = webhook_data.get('msgContent', {})
+            list_response = msg_content.get('listResponseMessage')
             
-            return JSONResponse(
-                status_code=200,
-                content={
-                    "status": "interpretado",
-                    "remetente": remetente,
-                    "nome_remetente": nome_remetente,
-                    "cpf_encontrado": resultado.get("cpf"),
-                    "solicitar_cpf": resultado.get("solicitar_cpf"),
-                    "mensagem_recebida": texto_mensagem[:50] + "..." if len(texto_mensagem) > 50 else texto_mensagem
-                }
-            )
+            if list_response:
+                # É UMA RESPOSTA DE MENU INTERATIVO
+                # --------------------------------
+                single_select = list_response.get('singleSelectReply', {})
+                row_id = single_select.get('selectedRowId')
+                opcao_selecionada = list_response.get('title', 'Opção não identificada')
+                
+                logger.info(f"📋 RESPOSTA DE MENU de {nome_remetente}: {opcao_selecionada}")
+                logger.info(f"🎯 Row ID capturado: {row_id}")
+                
+                # Processar resposta do menu usando a nova função
+                logger.info(f"🔄 Processando resposta de menu: {row_id} do usuário {remetente}")
+                resultado_menu = whatsapp_service.processar_resposta_menu_colaborador(
+                    remetente=remetente,
+                    row_id=row_id,
+                    webhook_data=webhook_data
+                )
+                logger.info(f"✅ Resultado do processamento: {resultado_menu}")
+                
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "status": "menu_processado",
+                        "remetente": remetente,
+                        "nome_remetente": nome_remetente,
+                        "opcao_selecionada": opcao_selecionada,
+                        "row_id": row_id,
+                        "acao_executada": resultado_menu.get("acao_executada"),
+                        "sucesso": resultado_menu.get("sucesso")
+                    }
+                )
+            
+            else:
+                # É UMA MENSAGEM DE TEXTO NORMAL
+                # -----------------------------
+                logger.info(f"💬 Mensagem de {nome_remetente}: {texto_mensagem}")
+                
+                # Interpretar mensagem do usuário com IA
+                resultado = whatsapp_service.interpretar_mensagem_usuario(remetente, texto_mensagem, message_id)
+                
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "status": "interpretado",
+                        "remetente": remetente,
+                        "nome_remetente": nome_remetente,
+                        "cpf_encontrado": resultado.get("cpf"),
+                        "solicitar_cpf": resultado.get("solicitar_cpf"),
+                        "mensagem_recebida": texto_mensagem[:50] + "..." if len(texto_mensagem) > 50 else texto_mensagem
+                    }
+                )
         else:
             # Mensagem não válida ou tipo não suportado
             return JSONResponse(status_code=200, content={"status": "ignorado"})
