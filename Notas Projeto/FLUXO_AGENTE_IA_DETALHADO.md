@@ -288,3 +288,145 @@ graph TD
 4. **Factory Pattern**
    - Criação de clientes API
    - Instanciação de serviços 
+
+# 🔍 Fluxo de Identificação de Usuários - V1
+
+## 📋 Visão Geral
+Este documento detalha o fluxo de identificação de usuários (clientes e corretores) implementado no arquivo `buscar_usuarios_supabase.py`.
+
+## 🔄 Fluxograma do Processo
+
+```mermaid
+graph TD
+    A[Início - Recebe CPF] --> B{Validar CPF}
+    
+    B -->|Inválido| C[Retorna Erro de CPF Inválido]
+    
+    B -->|Válido| D[Formata CPF]
+    
+    D --> E{Busca Colaborador no Supabase}
+    
+    E -->|Encontrado| F{Verifica se está Ativo}
+    F -->|Ativo| G[Retorna Dados do Colaborador]
+    F -->|Inativo| H[Retorna Colaborador Inativo]
+    
+    E -->|Não Encontrado| I[Processa como Cliente]
+    
+    I --> J{Busca Cliente por CPF}
+    
+    J -->|Não Encontrado| K[Retorna Cliente Não Cadastrado]
+    
+    J -->|Encontrado| L{Verifica Telefone}
+    
+    L -->|Sem Telefone| M[Solicita Telefone]
+    
+    L -->|Com Telefone| N{Busca Negociação Ativa}
+    
+    N -->|Sem Negociação| O[Retorna Cliente sem Negociação]
+    
+    N -->|Com Negociação| P[Analisa Documentos]
+    
+    P --> Q[Busca Conversas]
+    
+    Q --> R[Análise GPT]
+    
+    R --> S[Retorna Resposta Completa]
+```
+
+## 📝 Detalhamento das Etapas
+
+### 1. Entrada do Processo
+- Recebe CPF do usuário
+- Opcionalmente recebe telefone
+- Função principal: `identificar_tipo_usuario(cpf: str, telefone: str = None)`
+
+### 2. Validação Inicial
+- Verifica formato do CPF
+- Remove caracteres especiais
+- Confirma se tem 11 dígitos
+- Função: `validar_formatar_cpf(cpf: str)`
+
+### 3. Busca de Colaborador
+- Procura primeiro na tabela `system_users`
+- Verifica com CPF formatado e depois limpo
+- Valida se o colaborador está ativo
+- Função: `buscar_usuario_por_cpf(cpf: str)`
+
+### 4. Processamento de Cliente
+- Se não for colaborador, busca na tabela `clientes`
+- Verifica existência de cadastro
+- Função: `buscar_cliente_por_cpf(cpf: str)`
+
+### 5. Análise de Negociação
+- Busca negociações ativas pelo telefone
+- Analisa documentos pendentes
+- Recupera histórico de conversas
+- Funções:
+  - `buscar_negociacao_ativa(telefone: str)`
+  - `analisar_documentos_faltantes(negotiation_id: str)`
+  - `buscar_conversas_ia_cliente(negotiation_id: str)`
+
+## 🔄 Tipos de Retorno
+
+### 1. Para Colaboradores
+```json
+{
+    "tipo": "colaborador",
+    "cpf_valido": true,
+    "dados_usuario": {
+        "nome": "Nome do Colaborador",
+        "setor": "Setor",
+        "funcao": "Função"
+    }
+}
+```
+
+### 2. Para Clientes
+```json
+{
+    "tipo": "cliente",
+    "cliente_cadastrado": true,
+    "dados_cliente": {},
+    "negociacao_ativa": true,
+    "analise_documentos": {},
+    "analise_gpt": {}
+}
+```
+
+### 3. Para Erros
+```json
+{
+    "tipo": "erro",
+    "cpf_valido": false,
+    "mensagem": "Descrição do erro"
+}
+```
+
+## 🔒 Segurança e Validações
+
+1. **Validação de CPF**
+   - Remove caracteres especiais
+   - Verifica quantidade de dígitos
+   - Formata para padrão XXX.XXX.XXX-XX
+
+2. **Verificação de Acesso**
+   - Valida se colaborador está ativo
+   - Verifica permissões do usuário
+
+3. **Tratamento de Erros**
+   - Logs detalhados de erros
+   - Mensagens amigáveis para usuário
+   - Rastreamento de exceções
+
+## 📊 Métricas e Logs
+
+- Logs detalhados de cada etapa
+- Rastreamento de tempo de processamento
+- Registro de erros e exceções
+- Monitoramento de performance
+
+## 🔄 Versão Atual
+
+- Versão: 1.0
+- Data: Março/2024
+- Arquivo: `buscar_usuarios_supabase.py` 

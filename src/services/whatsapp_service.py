@@ -44,6 +44,9 @@ class WhatsAppService:
             Dict: Resposta da API
         """
         try:
+            # CORREÇÃO: Garantir que quebras de linha sejam interpretadas corretamente
+            mensagem_formatada = mensagem.replace('\\n', '\n') if '\\n' in mensagem else mensagem
+            
             # Nova URL da API W-API
             url = f"{self.api_host}/v1/message/send-text"
             
@@ -55,7 +58,7 @@ class WhatsAppService:
             # Dados da mensagem conforme nova API
             payload = {
                 "phone": numero_telefone,
-                "message": mensagem,
+                "message": mensagem_formatada,
                 "delayMessage": 2
             }
             
@@ -204,7 +207,7 @@ class WhatsAppService:
             # Mensagem de boas-vindas da Bia
             mensagem = (
                 "Olá! 👋\n\n"
-                "Aqui é a Bia, Corretora de Locação da Toca Imóveis! 🏠\n\n"
+                "Aqui é a Bia, Corretora de Locação\n\n"
                 "Para iniciarmos seu atendimento, por favor me envie seu CPF (apenas números).\n\n"
                 "Exemplo: 12345678901"
             )
@@ -249,12 +252,7 @@ class WhatsAppService:
             resultado = self.openai_service.interpretar_mensagem(mensagem)
             logger.info(f"🔍 Resultado da interpretação: {resultado}")
             
-            # Se for novo usuário, enviar primeira mensagem
-            if resultado.get("novo_usuario"):
-                logger.info("👋 Novo usuário detectado")
-                return self.primeira_mensagem(remetente, message_id)
-            
-            # Se encontrou CPF, armazenar e identificar tipo
+            # PRIORIDADE 1: Se encontrou CPF, processar imediatamente
             if resultado.get("cpf"):
                 cpf = resultado["cpf"]
                 self.cpfs_temp[remetente] = cpf
@@ -273,9 +271,17 @@ class WhatsAppService:
                 # Adicionar tipo de usuário ao resultado
                 resultado["tipo_usuario"] = identificacao["tipo"]
                 resultado["mensagem_resposta"] = mensagem_resposta
-            else:
-                # Enviar resposta ao usuário
-                self.enviar_mensagem(remetente, resultado["mensagem_resposta"])
+                
+                return resultado
+            
+            # PRIORIDADE 2: Se for novo usuário e NÃO tem CPF, enviar primeira mensagem
+            if resultado.get("novo_usuario"):
+                logger.info("👋 Novo usuário detectado")
+                return self.primeira_mensagem(remetente, message_id)
+            
+            # PRIORIDADE 3: Outras mensagens
+            # Enviar resposta ao usuário
+            self.enviar_mensagem(remetente, resultado["mensagem_resposta"])
             
             return resultado
             
