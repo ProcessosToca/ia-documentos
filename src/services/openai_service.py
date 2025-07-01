@@ -273,4 +273,464 @@ class OpenAIService:
                 "resumo": f"Erro na análise: {str(e)}",
                 "proxima_mensagem": "Vou analisar sua situação e retorno em breve. Obrigado pela paciência!",
                 "contexto": "erro_analise"
+            }
+
+    def interpretar_intencao_mensagem(self, mensagem: str, remetente: str = None) -> Dict[str, Any]:
+        """
+        Interpretador inteligente para detectar intenções em mensagens usando GPT
+        
+        Esta função é o INTERPRETADOR CENTRAL que processa TODAS as mensagens
+        antes do fluxo principal, identificando:
+        - Saudações (oi, olá, bom dia) → Primeira mensagem da Bia
+        - Solicitações de menu (menu, opções) → Menu apropriado por tipo de usuário
+        - Conversas normais → Continua fluxo original
+        
+        Args:
+            mensagem (str): Texto da mensagem recebida do usuário
+            remetente (str, optional): Número do telefone (para contexto futuro)
+            
+        Returns:
+            Dict com análise da intenção:
+                - intencao: "saudacao" | "menu" | "conversa_normal" | "duvida_tecnica"
+                - confianca: 0.0-1.0 (nível de certeza da IA)
+                - bypass_fluxo: True se deve interceptar, False se continua normal
+                - contexto: "primeira_interacao" | "usuario_conhecido"
+                - acao_sugerida: "primeira_mensagem" | "enviar_menu" | "continuar_fluxo"
+        
+        Exemplo de uso:
+            >>> interpretacao = service.interpretar_intencao_mensagem("oi, tudo bem?")
+            >>> print(interpretacao["intencao"])  # "saudacao"
+            >>> print(interpretacao["bypass_fluxo"])  # True
+        """
+        try:
+            logger.info(f"🧠 Interpretando intenção da mensagem: {mensagem[:50]}...")
+            
+            # Prompt especializado para detectar intenções
+            prompt = f"""Analise esta mensagem do WhatsApp e identifique a intenção do usuário:
+
+MENSAGEM: "{mensagem}"
+
+Classifique a intenção como:
+
+1. "saudacao" - Se contém cumprimentos como: oi, olá, bom dia, boa tarde, boa noite, hey, e aí, tudo bem, como vai, etc.
+
+2. "menu" - Se solicita navegação como: menu, opções, voltar menu, menu inicial, mostrar opções, escolhas, navegar, etc.
+
+3. "conversa_normal" - Se contém: CPF, números, perguntas específicas, documentos, informações pessoais
+
+4. "duvida_tecnica" - Se contém perguntas sobre: locação, processos, contratos, documentação, análise, negociação
+
+IMPORTANTE:
+- Alta confiança (>0.8) apenas se for CLARAMENTE uma saudação ou solicitação de menu
+- Média confiança (0.5-0.8) se houver dúvida
+- Baixa confiança (<0.5) se for ambíguo
+
+Responda APENAS em JSON válido:
+{{
+  "intencao": "saudacao|menu|conversa_normal|duvida_tecnica",
+  "confianca": 0.0,
+  "bypass_fluxo": true/false,
+  "contexto": "primeira_interacao|usuario_conhecido",
+  "acao_sugerida": "primeira_mensagem|enviar_menu|continuar_fluxo"
+}}"""
+
+            # Chamada para GPT com configurações otimizadas
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """Você é um analisador especializado em intenções de mensagens para um sistema de atendimento imobiliário.
+
+Sua função é identificar com precisão a intenção real do usuário:
+
+- SAUDAÇÕES: Cumprimentos gerais e iniciais de conversa
+- MENU: Solicitações explícitas de navegação ou opções
+- CONVERSA_NORMAL: Informações específicas como CPF, dados pessoais
+- DUVIDA_TECNICA: Perguntas sobre processos, contratos, locação
+
+Seja conservador: apenas classifique como "saudacao" ou "menu" se tiver ALTA CERTEZA.
+Caso contrário, use "conversa_normal" para manter o fluxo original funcionando.
+
+SEMPRE retorne JSON válido sem texto adicional."""
+                    },
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.1,  # Baixa criatividade para consistência
+                max_tokens=150    # Resposta curta e objetiva
+            )
+            
+            # Processar resposta do GPT
+            resposta_texto = response.choices[0].message.content.strip()
+            logger.info(f"🤖 Resposta GPT: {resposta_texto[:100]}...")
+            
+            try:
+                # Tentar fazer parse do JSON
+                resultado = json.loads(resposta_texto)
+                
+                # Validar campos obrigatórios
+                campos_obrigatorios = ["intencao", "confianca", "bypass_fluxo", "acao_sugerida"]
+                for campo in campos_obrigatorios:
+                    if campo not in resultado:
+                        raise ValueError(f"Campo obrigatório ausente: {campo}")
+                
+                # Ajustar bypass_fluxo baseado na intenção e confiança
+                if resultado["confianca"] < 0.7:
+                    resultado["bypass_fluxo"] = False
+                    resultado["acao_sugerida"] = "continuar_fluxo"
+                else:
+                    # Para saudações e menu com alta confiança, sempre fazer bypass
+                    if resultado["intencao"] in ["saudacao", "menu"]:
+                        resultado["bypass_fluxo"] = True
+                        if resultado["intencao"] == "saudacao":
+                            resultado["acao_sugerida"] = "primeira_mensagem"
+                        elif resultado["intencao"] == "menu":
+                            resultado["acao_sugerida"] = "enviar_menu"
+                
+                logger.info(f"✅ Intenção detectada: {resultado['intencao']} (confiança: {resultado['confianca']})")
+                return resultado
+                
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.warning(f"⚠️ Erro ao processar JSON do GPT: {e}")
+                # Fallback: continuar fluxo normal
+                return {
+                    "intencao": "conversa_normal",
+                    "confianca": 0.0,
+                    "bypass_fluxo": False,
+                    "contexto": "usuario_conhecido", 
+                    "acao_sugerida": "continuar_fluxo",
+                    "erro": "json_parse_error"
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Erro crítico no interpretador de intenções: {str(e)}")
+            # Fallback seguro: sempre continuar fluxo normal em caso de erro
+            return {
+                "intencao": "conversa_normal",
+                "confianca": 0.0,
+                "bypass_fluxo": False,
+                "contexto": "usuario_conhecido",
+                "acao_sugerida": "continuar_fluxo",
+                "erro": str(e)
+            }
+
+
+    def validar_dado_cliente(self, tipo_dado: str, valor: str) -> Dict[str, Any]:
+        """
+        Valida dados do cliente coletados durante processo de fechamento usando GPT
+        
+        Esta função usa IA para validar se os dados fornecidos pelo colaborador
+        são válidos para um processo de locação imobiliária.
+        
+        Args:
+            tipo_dado (str): Tipo do dado a validar ("nome" | "telefone")
+            valor (str): Valor fornecido pelo colaborador para validação
+            
+        Returns:
+            Dict com resultado da validação:
+                - valido: True se dado é válido, False se inválido
+                - valor_corrigido: Valor formatado/corrigido se necessário
+                - motivo_erro: Explicação se inválido
+                - sugestao: Sugestão de correção se aplicável
+        
+        Exemplos de uso:
+            >>> resultado = service.validar_dado_cliente("nome", "João Silva")
+            >>> print(resultado["valido"])  # True
+            
+            >>> resultado = service.validar_dado_cliente("telefone", "11999999999")
+            >>> print(resultado["valor_corrigido"])  # "(11) 99999-9999"
+        """
+        try:
+            logger.info(f"🔍 Validando {tipo_dado}: {valor[:30]}...")
+            
+            if tipo_dado == "nome":
+                # Prompt para validação de nome
+                prompt = f"""Analise se este é um nome válido para um cliente de locação imobiliária:
+
+NOME: "{valor}"
+
+Critérios FLEXÍVEIS de validação:
+1. Deve conter pelo menos 2 palavras (nome + sobrenome)
+2. Deve usar caracteres alfabéticos (permitir acentos, espaços)
+3. Não deve conter números ou símbolos especiais
+4. Deve parecer um nome real de pessoa
+5. Aceitar nomes compostos, duplos, estrangeiros
+
+Exemplos VÁLIDOS: "João Silva", "Maria Santos", "José da Silva", "Ana Beatriz", "Carlos Eduardo", "Andreia Robe", "Maria José", "João Pedro"
+Exemplos INVÁLIDOS: "João", "123", "abc", "João123", "@#$", "X Y", "A B"
+
+IMPORTANTE: Seja FLEXÍVEL com nomes reais. Se parece um nome de pessoa válido com pelo menos 2 palavras, ACEITE.
+
+Responda APENAS em JSON:
+{{
+  "valido": true/false,
+  "valor_corrigido": "Nome formatado corretamente",
+  "motivo_erro": "Explicação se inválido",
+  "sugestao": "Sugestão de correção se necessário"
+}}"""
+
+            elif tipo_dado == "telefone":
+                # Prompt para validação de telefone
+                prompt = f"""Analise se este é um telefone válido brasileiro:
+
+TELEFONE: "{valor}"
+
+Critérios de validação:
+1. Deve ter 10 ou 11 dígitos (com DDD)
+2. DDD válido brasileiro (11-99)
+3. Número de celular ou fixo válido
+4. Pode ter ou não formatação
+5. Não deve conter letras
+
+Exemplos VÁLIDOS: "11999999999", "(11) 99999-9999", "1133334444"
+Exemplos INVÁLIDOS: "999999999", "abc", "123", "00999999999"
+
+Se válido, formate como: (XX) XXXXX-XXXX para celular ou (XX) XXXX-XXXX para fixo
+
+Responda APENAS em JSON:
+{{
+  "valido": true/false,
+  "valor_corrigido": "Telefone formatado: (XX) XXXXX-XXXX",
+  "motivo_erro": "Explicação se inválido",
+  "sugestao": "Sugestão de correção se necessário"
+}}"""
+
+            else:
+                return {
+                    "valido": False,
+                    "motivo_erro": f"Tipo de dado não suportado: {tipo_dado}",
+                    "sugestao": "Use 'nome' ou 'telefone'"
+                }
+
+            # Chamada para GPT com configurações de validação
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """Você é um validador especializado em dados de clientes para processos imobiliários.
+
+Sua função é verificar se os dados fornecidos são válidos e úteis para um processo de locação.
+
+Seja rigoroso na validação:
+- Nomes devem ser completos e reais
+- Telefones devem ser brasileiros válidos
+- Sempre formate corretamente os dados válidos
+- Forneça explicações claras para dados inválidos
+
+SEMPRE retorne JSON válido sem texto adicional."""
+                    },
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.1,  # Baixa criatividade para consistência na validação
+                max_tokens=200
+            )
+            
+            # Processar resposta do GPT
+            resposta_texto = response.choices[0].message.content.strip()
+            logger.info(f"🤖 Validação GPT: {resposta_texto[:100]}...")
+            
+            try:
+                # Parse do JSON
+                resultado = json.loads(resposta_texto)
+                
+                # Validar campos obrigatórios
+                if "valido" not in resultado:
+                    raise ValueError("Campo 'valido' ausente na resposta")
+                
+                # Adicionar informações de contexto
+                resultado.update({
+                    "tipo_dado": tipo_dado,
+                    "valor_original": valor,
+                    "timestamp_validacao": "now"
+                })
+                
+                status = "✅ VÁLIDO" if resultado["valido"] else "❌ INVÁLIDO"
+                logger.info(f"{status} - {tipo_dado}: {valor[:20]}...")
+                
+                return resultado
+                
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.warning(f"⚠️ Erro ao processar JSON de validação: {e}")
+                # Fallback: considerar inválido se não conseguir processar
+                return {
+                    "valido": False,
+                    "motivo_erro": "Erro interno na validação",
+                    "sugestao": f"Tente novamente com um {tipo_dado} mais claro",
+                    "erro_processamento": str(e)
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Erro crítico na validação de dados: {str(e)}")
+            # Fallback seguro: sempre rejeitar em caso de erro
+            return {
+                "valido": False,
+                "motivo_erro": "Erro técnico na validação",
+                "sugestao": f"Tente novamente fornecendo o {tipo_dado}",
+                "erro_critico": str(e)
+            }
+
+    def responder_duvida_locacao(self, duvida: str, contexto_colaborador: dict = None) -> Dict[str, Any]:
+        """
+        IA especializada em responder dúvidas sobre negociação de locação para colaboradores
+        
+        Esta função é chamada quando um colaborador seleciona "Usar IA para Dúvidas" no menu
+        e envia uma pergunta relacionada a processos de locação, documentos, negociação, etc.
+        
+        Args:
+            duvida (str): Pergunta/dúvida do colaborador sobre locação
+            contexto_colaborador (dict, optional): Dados do colaborador (setor, nome, etc.)
+            
+        Returns:
+            Dict: Resposta estruturada com:
+                - resposta: Texto da resposta especializada
+                - categoria: Categoria da dúvida (documentos, processo, juridico, etc.)
+                - confianca: Nível de confiança da resposta (alto/medio/baixo)
+                - sugestoes_extras: Sugestões adicionais se aplicável
+                
+        Exemplo:
+            >>> resultado = responder_duvida_locacao("Como validar comprovante de renda?")
+            >>> print(resultado["resposta"])
+            "Para validar comprovante de renda, você deve verificar..."
+        """
+        try:
+            logger.info(f"🤖 Processando dúvida de locação: {duvida[:50]}...")
+            
+            # Extrair informações do colaborador se disponível
+            nome_colaborador = "Colaborador"
+            setor_colaborador = "Não informado"
+            
+            if contexto_colaborador:
+                nome_colaborador = contexto_colaborador.get('nome', 'Colaborador')
+                setor_colaborador = contexto_colaborador.get('setor', 'Não informado')
+            
+            # Prompt especializado em negociação de locação
+            prompt_sistema = """
+            Você é um ESPECIALISTA em NEGOCIAÇÃO DE LOCAÇÃO IMOBILIÁRIA e assistente para colaboradores da Toca Imóveis.
+
+            ESPECIALIDADES:
+            🏠 Processos de locação sem fiador
+            📄 Documentação necessária (RG, CPF, comprovantes)
+            💰 Análise de renda e capacidade financeira
+            📋 Contratos e termos legais
+            🔍 Validação de documentos
+            👥 Relacionamento com clientes
+            ⚖️ Aspectos jurídicos básicos
+            📊 Fluxos e procedimentos internos
+
+            INSTRUÇÕES:
+            - Responda de forma PRÁTICA e OBJETIVA
+            - Use linguagem PROFISSIONAL mas ACESSÍVEL
+            - Forneça PASSOS CONCRETOS quando aplicável
+            - Mencione DOCUMENTOS ESPECÍFICOS quando necessário
+            - Use EMOJIS para organizar a informação
+            - Se não souber algo específico da Toca Imóveis, seja transparente
+            - Foque em SOLUÇÕES PRÁTICAS para o dia a dia
+
+            FORMATO DA RESPOSTA:
+            - Use quebras de linha para facilitar leitura no WhatsApp
+            - Organize em tópicos quando necessário
+            - Seja direto e evite textos muito longos
+            """
+
+            prompt_usuario = f"""
+            CONTEXTO DO COLABORADOR:
+            👤 Nome: {nome_colaborador}
+            🏢 Setor: {setor_colaborador}
+
+            DÚVIDA:
+            {duvida}
+
+            Responda esta dúvida de forma especializada, considerando que é um colaborador da Toca Imóveis que precisa de orientação prática para seu trabalho diário.
+
+            Formate sua resposta em JSON com:
+            - "resposta": Resposta detalhada e prática para a dúvida
+            - "categoria": Categoria da dúvida (documentos|processo|juridico|relacionamento|financeiro|outros)
+            - "confianca": Nível de confiança da resposta (alto|medio|baixo)
+            - "sugestoes_extras": Array com sugestões adicionais ou próximos passos (máximo 3 sugestões)
+            """
+
+            # Fazer chamada para GPT-4
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": prompt_sistema},
+                    {"role": "user", "content": prompt_usuario}
+                ],
+                temperature=0.3,  # Baixa temperatura para respostas mais consistentes
+                max_tokens=800,   # Espaço suficiente para resposta detalhada
+                top_p=0.9
+            )
+
+            # Extrair e processar resposta
+            resposta_texto = response.choices[0].message.content.strip()
+            
+            try:
+                # Tentar fazer parse do JSON
+                resultado = json.loads(resposta_texto)
+                
+                # Validar estrutura da resposta
+                if not all(key in resultado for key in ['resposta', 'categoria', 'confianca']):
+                    raise ValueError("JSON não contém todas as chaves necessárias")
+                
+                # Garantir que sugestoes_extras seja uma lista
+                if 'sugestoes_extras' not in resultado:
+                    resultado['sugestoes_extras'] = []
+                elif not isinstance(resultado['sugestoes_extras'], list):
+                    resultado['sugestoes_extras'] = [str(resultado['sugestoes_extras'])]
+                
+                logger.info(f"✅ Dúvida processada - Categoria: {resultado['categoria']}")
+                logger.info(f"🎯 Confiança: {resultado['confianca']}")
+                
+                return {
+                    "sucesso": True,
+                    "resposta": resultado['resposta'],
+                    "categoria": resultado['categoria'],
+                    "confianca": resultado['confianca'],
+                    "sugestoes_extras": resultado['sugestoes_extras'],
+                    "colaborador": nome_colaborador,
+                    "setor": setor_colaborador
+                }
+                
+            except (json.JSONDecodeError, ValueError) as e:
+                # Se JSON inválido, usar resposta como texto simples
+                logger.warning(f"⚠️ Resposta não é JSON válido: {str(e)}")
+                
+                # Limpar a resposta e usar como texto
+                resposta_limpa = resposta_texto.replace('```json', '').replace('```', '').strip()
+                
+                # Tentar extrair pelo menos a resposta principal
+                if '"resposta"' in resposta_limpa:
+                    import re
+                    match = re.search(r'"resposta":\s*"([^"]*)"', resposta_limpa)
+                    if match:
+                        resposta_limpa = match.group(1).replace('\\n', '\n')
+                
+                return {
+                    "sucesso": True,
+                    "resposta": resposta_limpa,
+                    "categoria": "geral",
+                    "confianca": "medio",
+                    "sugestoes_extras": ["Posso esclarecer mais detalhes se precisar"],
+                    "colaborador": nome_colaborador,
+                    "setor": setor_colaborador,
+                    "aviso": "Resposta processada como texto livre"
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Erro ao processar dúvida de locação: {str(e)}")
+            
+            return {
+                "sucesso": False,
+                "resposta": "Desculpe, tive um problema técnico ao processar sua dúvida. Pode reformular sua pergunta ou tentar novamente em alguns instantes?",
+                "categoria": "erro",
+                "confianca": "baixo",
+                "sugestoes_extras": [
+                    "Tente reformular a pergunta",
+                    "Seja mais específico sobre o tema",
+                    "Verifique se é uma dúvida sobre locação"
+                ],
+                "colaborador": nome_colaborador,
+                "setor": setor_colaborador,
+                "erro": str(e)
             } 
