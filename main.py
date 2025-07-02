@@ -203,7 +203,7 @@ if __name__ == "__main__":
     logger.info("✅ Configurações validadas")
     logger.info("📱 WhatsApp W-API configurado")
     logger.info("🌐 Servidor iniciando na porta 8000")
-    logger.info("🏠 Toca Imóveis - Sistema pronto para atender!")
+    logger.info(" Sistema pronto para atender!")
     
     # Iniciar servidor
     uvicorn.run(

@@ -357,7 +357,7 @@ def analisar_documentos_faltantes(negotiation_id: str) -> dict:
         logger.info(f"✅ Análise de documentos concluída: {resultado['total_recebidos']}/{resultado['total_obrigatorios']} documentos ({resultado['progresso_percentual']:.1f}%)")
         
         return resultado
-        
+
     except Exception as e:
         logger.error(f"❌ Erro ao analisar documentos faltantes: {str(e)}")
         return {
@@ -687,56 +687,4 @@ def identificar_tipo_usuario(cpf: str, telefone: str = None) -> dict:
             }
         }
 
-# Função de teste para verificar funcionamento
-def testar_sistema(cpf_teste: str, telefone_teste: str = None):
-    """
-    Função para testar o sistema completo
-    """
-    logger.info(f"🧪 Testando sistema com CPF: {cpf_teste}")
-    resultado = identificar_tipo_usuario(cpf_teste, telefone_teste)
-    
-    print("=" * 60)
-    print("RESULTADO DO TESTE:")
-    print("=" * 60)
-    print(json.dumps(resultado, indent=2, ensure_ascii=False))
-    print("=" * 60)
-    
-    return resultado
 
-# Handler principal para Edge Function
-def handler(request):
-    """
-    Handler principal para requisições da Edge Function
-    """
-    try:
-        # Processar requisição
-        body = request.get_json() if hasattr(request, 'get_json') else {}
-        cpf = body.get('cpf', '')
-        telefone = body.get('telefone', '')
-        
-        if not cpf:
-            return {
-                "statusCode": 400,
-                "body": json.dumps({
-                    "erro": "CPF é obrigatório",
-                    "mensagem": "Por favor, informe um CPF válido"
-                })
-            }
-        
-        # Processar identificação
-        resultado = identificar_tipo_usuario(cpf, telefone)
-        
-        return {
-            "statusCode": 200,
-            "body": json.dumps(resultado, ensure_ascii=False)
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Erro no handler principal: {str(e)}")
-        return {
-            "statusCode": 500,
-            "body": json.dumps({
-                "erro": str(e),
-                "mensagem": "Erro interno do servidor"
-            })
-        }
