@@ -1,10 +1,12 @@
 import os
-import requests
-from typing import Dict, Any
+import re
+from typing import Dict, Any, Optional
 import logging
 from .openai_service import OpenAIService
 from .buscar_usuarios_supabase import identificar_tipo_usuario
 from .menu_service_whatsapp import MenuServiceWhatsApp
+from .whatsapp_api import WhatsAppAPI
+from .session_manager import SessionManager
 import time
 
 # Configuração de logging
@@ -45,20 +47,18 @@ class WhatsAppService:
     - Fallbacks para quando menus falham
     
     VERSÃO: 2.0 (Adicionado suporte a menus para colaboradores)
-    DATA: Março/2024
+    DATA: JUlho/2025
     """
     
     def __init__(self):
-        # Carregar configurações do .env
-        self.api_host = os.getenv('W_API_HOST', 'https://api.w-api.app')
-        self.instance_id = os.getenv('W_API_INSTANCE_ID')
-        self.token = os.getenv('W_API_TOKEN')
+        # MODULARIZAÇÃO: Inicializar módulos especializados
+        # =================================================
         
-        # Headers padrão com Authorization Bearer
-        self.headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {self.token}'
-        }
+        # Módulo de comunicação com WhatsApp API
+        self.whatsapp_api = WhatsAppAPI()
+        
+        # Módulo de gestão de sessões ativas
+        self.session_manager = SessionManager(timeout_sessao=30 * 60)  # 30 minutos
         
         # Inicializar OpenAI Service
         self.openai_service = OpenAIService()
@@ -67,12 +67,42 @@ class WhatsAppService:
         # Este serviço gerencia menus interativos enviados aos usuários
         self.menu_service = MenuServiceWhatsApp()
         
-        # Dicionário para armazenar CPFs temporariamente
-        self.cpfs_temp = {}
+        # NOVO: ConversationLogger para captura de conversas (OPCIONAL)
+        # =============================================================
+        try:
+            from .conversation_logger import ConversationLogger
+            self.conversation_logger = ConversationLogger()
+            self.logging_enabled = True
+            logger.info("🗂️ ConversationLogger ativado")
+        except Exception as e:
+            self.conversation_logger = None
+            self.logging_enabled = False
+            logger.warning(f"⚠️ ConversationLogger não disponível: {e}")
         
-        # Sistema de sessões com timeout para IA especializada
-        self.sessoes_ativas = {}
-        self.TIMEOUT_SESSAO = 30 * 60  # 30 minutos em segundos
+        # NOVO: Serviços de Consentimento e Coleta Expandida (OPCIONAL)
+        # =============================================================
+        try:
+            from .consentimento_service import ConsentimentoService
+            self.consentimento_service = ConsentimentoService()
+            logger.info("✅ ConsentimentoService inicializado")
+        except Exception as e:
+            self.consentimento_service = None
+            logger.warning(f"⚠️ ConsentimentoService não disponível: {e}")
+        
+        try:
+            from .coleta_dados_service import ColetaDadosService
+            self.coleta_dados_service = ColetaDadosService()
+            logger.info("✅ ColetaDadosService inicializado")
+        except Exception as e:
+            self.coleta_dados_service = None
+            logger.warning(f"⚠️ ColetaDadosService não disponível: {e}")
+        
+        # FLAG de controle para ativar/desativar novo fluxo (SEM QUEBRAR NADA)
+        self.fluxo_expandido_ativo = True
+        
+        # COMPATIBILIDADE: Manter referências diretas para não quebrar código existente
+        # ============================================================================
+        # Note: As propriedades @property são definidas na classe, não no __init__
         
         # Sistema de coleta de dados do cliente para fechamento
         # Formato: {telefone_colaborador: {"nome": "", "telefone": "", "etapa": "aguardando_nome|aguardando_telefone|concluido"}}
@@ -82,12 +112,30 @@ class WhatsAppService:
         # Formato: {telefone_corretor: {"cliente_nome": "", "cliente_telefone": "", "corretor_nome": "", "status": "..."}}
         self.atendimentos_cliente = {}
         
-        logger.info(f"WhatsApp Service inicializado para instância: {self.instance_id}")
-        logger.info("🔧 Novo recurso ativo: Menu diferenciado para colaboradores")
+        logger.info(f"WhatsApp Service inicializado com arquitetura modular")
+        logger.info("🔧 Módulos ativos: WhatsAppAPI + SessionManager + MenuService")
+        logger.info("✅ Compatibilidade mantida - todas as funcionalidades preservadas")
+
+    # PROPRIEDADES DE COMPATIBILIDADE
+    # ================================
+    # Estas propriedades redirecionam para os módulos apropriados
+    # mantendo a compatibilidade com código existente
+    
+    @property
+    def sessoes_ativas(self):
+        """Redireciona para SessionManager.sessoes_ativas (compatibilidade)"""
+        return self.session_manager.sessoes_ativas
+    
+    @property  
+    def TIMEOUT_SESSAO(self):
+        """Redireciona para SessionManager.TIMEOUT_SESSAO (compatibilidade)"""
+        return self.session_manager.TIMEOUT_SESSAO
 
     def verificar_numero_tem_whatsapp(self, numero_telefone: str) -> Dict[str, Any]:
         """
         Verifica se um número de telefone possui WhatsApp ativo
+        
+        MODULARIZADO: Esta função agora usa WhatsAppAPI
         
         Args:
             numero_telefone (str): Número no formato brasileiro (ex: 5511999999999)
@@ -95,51 +143,8 @@ class WhatsAppService:
         Returns:
             Dict: {"existe": bool, "numero": str, "sucesso": bool}
         """
-        try:
-            # Limpar número (remover caracteres especiais)
-            numero_limpo = ''.join(filter(str.isdigit, numero_telefone))
-            
-            # Se não começar com 55, adicionar
-            if not numero_limpo.startswith('55'):
-                numero_limpo = '55' + numero_limpo
-            
-            logger.info(f"📱 Verificando se número tem WhatsApp: {numero_limpo}")
-            
-            url = f"{self.api_host}/v1/contacts/phone-exists"
-            params = {
-                "instanceId": self.instance_id,
-                "phoneNumber": numero_limpo
-            }
-            
-            response = requests.get(url, headers=self.headers, params=params)
-            
-            if response.status_code == 200:
-                resultado = response.json()
-                existe = resultado.get("exists", False)
-                
-                logger.info(f"✅ Verificação WhatsApp: {numero_limpo} → {'EXISTE' if existe else 'NÃO EXISTE'}")
-                
-                return {
-                    "sucesso": True,
-                    "existe": existe,
-                    "numero": numero_limpo,
-                    "dados_api": resultado
-                }
-            else:
-                logger.error(f"❌ Erro na verificação WhatsApp: {response.status_code}")
-                return {
-                    "sucesso": False,
-                    "erro": f"API retornou status {response.status_code}",
-                    "numero": numero_limpo
-                }
-                
-        except Exception as e:
-            logger.error(f"❌ Erro ao verificar WhatsApp: {str(e)}")
-            return {
-                "sucesso": False,
-                "erro": str(e),
-                "numero": numero_telefone
-            }
+        # Redirecionar para o módulo WhatsAppAPI
+        return self.whatsapp_api.verificar_numero_tem_whatsapp(numero_telefone)
         
         # IMPORTANTE PARA MANUTENÇÃO:
         # ===========================
@@ -335,32 +340,22 @@ class WhatsAppService:
         """
         Verifica se existe uma sessão ativa para o telefone e se não expirou
         
+        MODULARIZADO: Esta função agora usa SessionManager
+        
         Args:
             telefone (str): Número do telefone do colaborador
             
         Returns:
             bool: True se sessão ativa, False se não existe ou expirou
         """
-        if telefone not in self.sessoes_ativas:
-            return False
-        
-        sessao = self.sessoes_ativas[telefone]
-        agora = time.time()
-        
-        if agora > sessao["expira_em"]:
-            # Sessão expirada, remover
-            logger.info(f"🕐 Sessão expirada para colaborador: {telefone}")
-            del self.sessoes_ativas[telefone]
-            return False
-        
-        # Atualizar última atividade
-        sessao["ultima_atividade"] = agora
-        logger.info(f"✅ Sessão ativa confirmada para colaborador: {telefone}")
-        return True
+        # Redirecionar para o módulo SessionManager
+        return self.session_manager.sessao_ativa(telefone)
 
     def enviar_mensagem(self, numero_telefone: str, mensagem: str) -> Dict[str, Any]:
         """
         Envia uma mensagem via W-API
+        
+        MODULARIZADO: Esta função agora usa WhatsAppAPI
         
         Args:
             numero_telefone (str): Número do telefone no formato internacional
@@ -369,54 +364,14 @@ class WhatsAppService:
         Returns:
             Dict: Resposta da API
         """
-        try:
-            # CORREÇÃO: Garantir que quebras de linha sejam interpretadas corretamente
-            mensagem_formatada = mensagem.replace('\\n', '\n') if '\\n' in mensagem else mensagem
-            
-            # Nova URL da API W-API
-            url = f"{self.api_host}/v1/message/send-text"
-            
-            # Parâmetros da nova API
-            params = {
-                "instanceId": self.instance_id
-            }
-            
-            # Dados da mensagem conforme nova API
-            payload = {
-                "phone": numero_telefone,
-                "message": mensagem_formatada,
-                "delayMessage": 2
-            }
-            
-            # Fazer requisição
-            response = requests.post(url, json=payload, headers=self.headers, params=params)
-            
-            if response.status_code == 200:
-                logger.info("✅ Mensagem enviada")
-                return {
-                    "sucesso": True,
-                    "dados": response.json(),
-                    "status_code": response.status_code
-                }
-            else:
-                logger.error(f"❌ Erro ao enviar mensagem: {response.status_code}")
-                return {
-                    "sucesso": False,
-                    "erro": response.text,
-                    "status_code": response.status_code
-                }
-                
-        except Exception as e:
-            logger.error(f"❌ Erro ao enviar mensagem: {str(e)}")
-            return {
-                "sucesso": False,
-                "erro": str(e),
-                "status_code": 500
-            }
+        # Redirecionar para o módulo WhatsAppAPI
+        return self.whatsapp_api.enviar_mensagem(numero_telefone, mensagem)
     
     def marcar_como_lida(self, numero_telefone: str, message_id: str) -> Dict[str, Any]:
         """
         Marca uma mensagem como lida
+        
+        MODULARIZADO: Esta função agora usa WhatsAppAPI
         
         Args:
             numero_telefone (str): Número do telefone
@@ -425,33 +380,14 @@ class WhatsAppService:
         Returns:
             Dict: Resposta da API
         """
-        try:
-            url = f"{self.api_host}/v1/message/read-message"
-            
-            params = {
-                "instanceId": self.instance_id
-            }
-            
-            payload = {
-                "phone": numero_telefone,
-                "messageId": message_id
-            }
-            
-            response = requests.post(url, json=payload, headers=self.headers, params=params)
-            
-            return {
-                "sucesso": response.status_code == 200,
-                "dados": response.json() if response.status_code == 200 else None,
-                "status_code": response.status_code
-            }
-            
-        except Exception as e:
-            logger.error(f"❌ Erro ao marcar mensagem como lida: {str(e)}")
-            return {"sucesso": False, "erro": str(e)}
+        # Redirecionar para o módulo WhatsAppAPI
+        return self.whatsapp_api.marcar_como_lida(numero_telefone, message_id)
     
     def processar_webhook_mensagem(self, webhook_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Processa dados do webhook de mensagem recebida (Formato W-API)
+        
+        MODULARIZADO: Esta função agora usa WhatsAppAPI
         
         Args:
             webhook_data (Dict): Dados do webhook da W-API
@@ -459,68 +395,8 @@ class WhatsAppService:
         Returns:
             Dict: Dados processados da mensagem
         """
-        try:
-            # Verificar se é o formato da W-API
-            if webhook_data.get('event') == 'webhookReceived':
-                # Verificar se não é mensagem nossa (fromMe)
-                if webhook_data.get('fromMe', False):
-                    return {
-                        "valido": False,
-                        "motivo": "Mensagem própria ignorada"
-                    }
-                
-                # Extrair dados da mensagem
-                msg_content = webhook_data.get('msgContent', {})
-                sender = webhook_data.get('sender', {})
-                chat = webhook_data.get('chat', {})
-                
-                # Extrair texto da mensagem
-                texto_mensagem = msg_content.get('conversation', '')
-                
-                # Se não for conversation, tentar outros campos
-                if not texto_mensagem:
-                    texto_mensagem = msg_content.get('text', '') or msg_content.get('message', '')
-                
-                # NOVO: Verificar se é resposta de menu (listResponseMessage)
-                # Para manter compatibilidade, vamos considerar válido mesmo sem texto
-                list_response = msg_content.get('listResponseMessage')
-                if list_response and not texto_mensagem:
-                    # É uma resposta de menu, criar texto descritivo para processamento
-                    opcao_selecionada = list_response.get('title', 'Opção selecionada')
-                    texto_mensagem = f"[MENU] {opcao_selecionada}"
-                
-                # Extrair remetente
-                remetente = sender.get('id', '')
-                nome_remetente = sender.get('pushName', '')
-                message_id = webhook_data.get('messageId', '')
-                
-                if remetente and texto_mensagem:
-                    return {
-                        "valido": True,
-                        "remetente": remetente,
-                        "mensagem": texto_mensagem,
-                        "nome_remetente": nome_remetente,
-                        "message_id": message_id,
-                        "chat_id": chat.get('id'),
-                        "timestamp": webhook_data.get('moment')
-                    }
-                else:
-                    return {
-                        "valido": False,
-                        "motivo": "Dados de mensagem incompletos"
-                    }
-            else:
-                return {
-                    "valido": False,
-                    "motivo": f"Evento não suportado: {webhook_data.get('event')}"
-                }
-                
-        except Exception as e:
-            logger.error(f"❌ Erro ao processar webhook: {str(e)}")
-            return {
-                "valido": False,
-                "erro": str(e)
-            }
+        # Redirecionar para o módulo WhatsAppAPI
+        return self.whatsapp_api.processar_webhook_mensagem(webhook_data)
     
     def primeira_mensagem(self, remetente: str, message_id: str = None) -> Dict[str, Any]:
         """
@@ -600,6 +476,15 @@ class WhatsAppService:
             if message_id:
                 self.marcar_como_lida(remetente, message_id)
             
+            # CAPTURA: Mensagem inicial do usuário (se for colaborador)
+            if self.logging_enabled and self.conversation_logger:
+                try:
+                    conversation_id = self.conversation_logger.get_active_conversation_id(remetente)
+                    if conversation_id:
+                        self.conversation_logger.add_message(conversation_id, "user", mensagem)
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro na captura de mensagem inicial: {e}")
+            
             # ====================================================================
             # PRIORIDADE 0: VERIFICAR SE É COLABORADOR EM PROCESSO DE COLETA DE DADOS
             # =========================================================================
@@ -608,6 +493,15 @@ class WhatsAppService:
             if remetente in self.coleta_dados_cliente and self.coleta_dados_cliente[remetente]["etapa"] != "concluido":
                 logger.info(f"📝 Colaborador em processo de coleta detectado: {remetente}")
                 return self.processar_coleta_dados_cliente(remetente, mensagem, message_id)
+            
+            # ====================================================================
+            # PRIORIDADE 0.5: VERIFICAR SE É CLIENTE EM PROCESSO DE COLETA EXPANDIDA
+            # ======================================================================
+            # NOVO: Verificar se cliente está em sessão de coleta de dados expandida
+            if (self.fluxo_expandido_ativo and self.coleta_dados_service and 
+                self.coleta_dados_service.obter_dados_sessao(remetente)):
+                logger.info(f"📋 Cliente em processo de coleta expandida detectado: {remetente}")
+                return self.processar_coleta_expandida_cliente(remetente, mensagem, message_id)
             
             # ====================================================================
             # PRIORIDADE 1: INTERPRETADOR INTELIGENTE GPT
@@ -647,7 +541,6 @@ class WhatsAppService:
             # PRIORIDADE 2: Se encontrou CPF, processar imediatamente
             if resultado.get("cpf"):
                 cpf = resultado["cpf"]
-                self.cpfs_temp[remetente] = cpf
                 logger.info(f"✅ CPF recebido: {cpf}")
                 
                 # Identificar se é corretor ou cliente
@@ -665,11 +558,36 @@ class WhatsAppService:
                     # -----------------------------------
                     logger.info("🏢 Usuário identificado como COLABORADOR - Enviando menu de opções")
                     
+                    # NOVO: Iniciar captura de conversa (se habilitado)
+                    conversation_id = None
+                    if self.logging_enabled:
+                        try:
+                            conversation_id = self.conversation_logger.start_conversation(
+                                remetente,
+                                "em_andamento",  # Inicia em andamento, move depois
+                                {
+                                    "type": "broker",
+                                    "name": identificacao.get("dados_usuario", {}).get("nome", "Corretor"),
+                                    "phone": remetente,
+                                    "cpf": cpf,
+                                    "sector": identificacao.get("dados_usuario", {}).get("setor", "N/A")
+                                }
+                            )
+                            logger.info(f"🗂️ Conversa iniciada: {conversation_id}")
+                        except Exception as e:
+                            logger.warning(f"⚠️ Erro ao iniciar captura: {e}")
+                    
                     # 1. Enviar mensagem de boas-vindas personalizada
                     self.enviar_mensagem(remetente, mensagem_resposta)
                     
+                    # CAPTURA: Mensagem de boas-vindas da IA
+                    if self.logging_enabled and self.conversation_logger and conversation_id:
+                        try:
+                            self.conversation_logger.add_message(conversation_id, "assistant", mensagem_resposta)
+                        except Exception as e:
+                            logger.warning(f"⚠️ Erro na captura de boas-vindas: {e}")
+                    
                     # 2. Aguardar 3 segundos para melhor experiência do usuário
-                    import time
                     time.sleep(3)
                     
                     # 3. Enviar menu de opções de atendimento específico para corretores
@@ -686,14 +604,97 @@ class WhatsAppService:
                         self.enviar_mensagem(remetente, "Menu de opções temporariamente indisponível. Digite sua dúvida que irei ajudar!")
                 
                 else:
-                    # FLUXO PARA CLIENTES (MANTIDO ORIGINAL)
-                    # -------------------------------------
-                    logger.info("👥 Usuário identificado como CLIENTE - Mantendo fluxo original")
+                    # FLUXO PARA CLIENTES - MELHORADO COM VERIFICAÇÃO DE CONSENTIMENTO
+                    # ----------------------------------------------------------------
+                    logger.info("👥 Usuário identificado como CLIENTE - Verificando consentimento LGPD")
                     
-                    # Para clientes, mantemos o comportamento original:
-                    # - Enviar apenas mensagem de resposta da identificação
-                    # - Fluxo normal de LGPD será tratado em outro momento/lugar
-                    self.enviar_mensagem(remetente, mensagem_resposta)
+                    # NOVO FLUXO: Verificar consentimento LGPD e enviar menu de concordância
+                    if self.fluxo_expandido_ativo and self.consentimento_service and self.consentimento_service.is_enabled():
+                        try:
+                            # Verificar consentimento do cliente
+                            resultado_consentimento = self.consentimento_service.verificar_status_consentimento(cpf)
+                            logger.info(f"🔒 Consentimento: {resultado_consentimento['mensagem']}")
+                            
+                            # Buscar dados do corretor que iniciou o atendimento
+                            corretor_telefone = self._obter_corretor_da_sessao(remetente)
+                            nome_cliente = self._obter_nome_cliente_da_sessao(corretor_telefone)
+                            
+                            if resultado_consentimento['pode_coletar_dados']:
+                                # CLIENTE PODE FORNECER DADOS - Nova mensagem de proteção + Menu LGPD
+                                
+                                # 1. Mensagem de proteção de dados personalizada
+                                mensagem_protecao = f"""🔒 *Proteção dos Seus Dados*
+
+Olá{f' {nome_cliente}' if nome_cliente else ''}! 
+
+Para prosseguir com seu atendimento de locação, precisamos coletar algumas informações pessoais adicionais.
+
+*Seus dados serão utilizados apenas para:*
+✅ Processamento da sua solicitação de locação
+✅ Comunicação sobre o andamento do processo  
+✅ Cumprimento de obrigações legais
+
+*Garantimos total segurança* conforme a Lei Geral de Proteção de Dados (LGPD).
+
+Você concorda com o tratamento dos seus dados pessoais?"""
+                                
+                                # 2. Enviar mensagem de proteção
+                                self.enviar_mensagem(remetente, mensagem_protecao)
+                                time.sleep(3)
+                                
+                                # 3. Enviar menu de concordância LGPD
+                                try:
+                                    resultado_menu = self.menu_service.enviar_menu_concordancia_dados(remetente)
+                                    if resultado_menu["sucesso"]:
+                                        logger.info(f"📋 Menu LGPD enviado para cliente: {remetente}")
+                                        
+                                        # Registrar estado de espera de concordância
+                                        if not hasattr(self, 'aguardando_lgpd'):
+                                            self.aguardando_lgpd = {}
+                                        self.aguardando_lgpd[remetente] = {
+                                            'cpf': cpf,
+                                            'corretor': corretor_telefone,
+                                            'nome_cliente': nome_cliente,
+                                            'timestamp': time.time()
+                                        }
+                                        
+                                    else:
+                                        logger.error(f"❌ Erro ao enviar menu LGPD: {resultado_menu.get('erro')}")
+                                        # Fallback: fluxo original
+                                        self.enviar_mensagem(remetente, mensagem_resposta)
+                                        
+                                except Exception as e_menu:
+                                    logger.error(f"❌ Erro no menu LGPD: {e_menu}")
+                                    # Fallback: fluxo original
+                                    self.enviar_mensagem(remetente, mensagem_resposta)
+                                
+                            else:
+                                # NÃO PODE COLETAR - Cliente já revogou consentimento
+                                mensagem_bloqueio = self.consentimento_service.gerar_mensagem_para_cliente(resultado_consentimento)
+                                self.enviar_mensagem(remetente, mensagem_bloqueio)
+                                
+                                # Notificar corretor sobre a situação
+                                if corretor_telefone:
+                                    mensagem_corretor = f"""⚠️ *Cliente com restrição LGPD*
+
+O cliente informou o CPF {cpf[:3]}***{cpf[-2:]} mas *revogou* seu consentimento para uso de dados pessoais.
+
+Não foi possível prosseguir com a coleta automática. Entre em contato diretamente para esclarecer a situação."""
+                                    
+                                    self.enviar_mensagem(corretor_telefone, mensagem_corretor)
+                                    logger.info(f"📞 Corretor {corretor_telefone} notificado sobre restrição LGPD")
+                                
+                                logger.warning(f"⛔ Coleta bloqueada por revogação de consentimento: {remetente}")
+                                
+                        except Exception as e:
+                            logger.warning(f"⚠️ Erro na verificação de consentimento: {e}")
+                            # Fallback seguro: manter fluxo original
+                            self.enviar_mensagem(remetente, mensagem_resposta)
+                    
+                    else:
+                        # FLUXO ORIGINAL PRESERVADO (quando serviços não disponíveis)
+                        logger.info("📄 Fluxo original mantido - serviços expandidos não disponíveis")
+                        self.enviar_mensagem(remetente, mensagem_resposta)
                 
                 # FINALIZAÇÃO COMUM PARA AMBOS OS FLUXOS
                 # ======================================
@@ -731,6 +732,451 @@ class WhatsAppService:
                 "novo_usuario": False,
                 "solicitar_cpf": True,
                 "mensagem_resposta": "Desculpe, tive um problema ao processar sua mensagem. Por favor, envie seu CPF novamente."
+            }
+
+    def _obter_corretor_da_sessao(self, cliente_telefone: str) -> Optional[str]:
+        """
+        Obtém o telefone do corretor que iniciou atendimento com este cliente
+        
+        Args:
+            cliente_telefone (str): Telefone do cliente
+            
+        Returns:
+            str ou None: Telefone do corretor se encontrado
+        """
+        try:
+            # Buscar nos atendimentos ativos
+            for corretor_telefone, dados in self.atendimentos_cliente.items():
+                if dados.get("cliente_telefone") == cliente_telefone:
+                    logger.info(f"🔍 Corretor encontrado: {corretor_telefone} para cliente {cliente_telefone}")
+                    return corretor_telefone
+            
+            # Buscar nas coletas de dados (corretor que coletou dados)
+            for corretor_telefone, dados_coleta in self.coleta_dados_cliente.items():
+                # Verificar se o telefone normalizado bate
+                telefone_coleta = dados_coleta.get("telefone", "")
+                # Extrair números do telefone
+                numeros_coleta = re.sub(r'\D', '', telefone_coleta)
+                numeros_cliente = re.sub(r'\D', '', cliente_telefone)
+                
+                if numeros_coleta and numeros_cliente and numeros_coleta in numeros_cliente:
+                    logger.info(f"🔍 Corretor encontrado via coleta: {corretor_telefone} para cliente {cliente_telefone}")
+                    return corretor_telefone
+            
+            logger.warning(f"⚠️ Corretor não encontrado para cliente: {cliente_telefone}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao buscar corretor: {e}")
+            return None
+    
+    def _obter_nome_cliente_da_sessao(self, corretor_telefone: str) -> Optional[str]:
+        """
+        Obtém o nome do cliente da sessão do corretor
+        
+        Args:
+            corretor_telefone (str): Telefone do corretor
+            
+        Returns:
+            str ou None: Nome do cliente se encontrado
+        """
+        try:
+            if not corretor_telefone:
+                return None
+            
+            # Buscar nos dados de coleta do corretor
+            if corretor_telefone in self.coleta_dados_cliente:
+                nome = self.coleta_dados_cliente[corretor_telefone].get("nome", "")
+                if nome:
+                    logger.info(f"👤 Nome do cliente encontrado: {nome[:10]}... para corretor {corretor_telefone}")
+                    return nome
+            
+            # Buscar nos atendimentos
+            if corretor_telefone in self.atendimentos_cliente:
+                nome = self.atendimentos_cliente[corretor_telefone].get("cliente_nome", "")
+                if nome:
+                    logger.info(f"👤 Nome do cliente encontrado via atendimento: {nome[:10]}...")
+                    return nome
+            
+            logger.info(f"⚠️ Nome do cliente não encontrado para corretor: {corretor_telefone}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao buscar nome do cliente: {e}")
+            return None
+
+    def processar_coleta_expandida_cliente(self, remetente: str, mensagem: str, message_id: str = None) -> Dict[str, Any]:
+        """
+        Processa coleta expandida de dados do cliente (email, data nascimento, endereço)
+        
+        Esta função gerencia todo o fluxo de coleta de dados complementares:
+        - E-mail com validação
+        - Data de nascimento com validação de idade (18+)
+        - CEP com busca automática via ViaCEP
+        - Confirmação de endereço
+        - Número e complemento
+        
+        Args:
+            remetente (str): Telefone do cliente
+            mensagem (str): Resposta do cliente
+            message_id (str): ID da mensagem para marcar como lida
+            
+        Returns:
+            Dict: Resultado do processamento
+        """
+        try:
+            logger.info(f"📋 Processando coleta expandida - Cliente: {remetente}")
+            
+            # Marcar mensagem como lida
+            if message_id:
+                self.marcar_como_lida(remetente, message_id)
+            
+            # Processar resposta usando o serviço de coleta
+            resultado = self.coleta_dados_service.processar_resposta(remetente, mensagem)
+            
+            if resultado['sucesso']:
+                logger.info(f"✅ Etapa processada: {resultado.get('proxima_etapa', 'N/A')}")
+                
+                # Enviar mensagem de resposta
+                if 'mensagem' in resultado:
+                    self.enviar_mensagem(remetente, resultado['mensagem'])
+                
+                # Verificar se coleta foi finalizada
+                if resultado.get('coleta_finalizada'):
+                    logger.info(f"🎉 Coleta de dados finalizada para cliente: {remetente}")
+                    
+                    # Obter dados completos
+                    dados_completos = resultado.get('dados_completos', {})
+                    
+                    # Limpar sessão de coleta
+                    self.coleta_dados_service.limpar_sessao(remetente)
+                    
+                    # AQUI VOCÊ PODE ADICIONAR LÓGICA PARA:
+                    # - Salvar dados no Supabase
+                    # - Transferir para corretor
+                    # - Enviar para sistema de CRM
+                    # - Etc.
+                    
+                    logger.info("🎯 Dados prontos para transferência/salvamento")
+                
+                return {
+                    "sucesso": True,
+                    "etapa": resultado.get('proxima_etapa', 'processando'),
+                    "mensagem_resposta": resultado.get('mensagem', 'Processado com sucesso'),
+                    "dados_completos": resultado.get('coleta_finalizada', False)
+                }
+            
+            else:
+                # Erro no processamento
+                logger.warning(f"⚠️ Erro na coleta: {resultado.get('erro', 'Erro desconhecido')}")
+                
+                # Verificar ações especiais
+                if resultado.get('acao') == 'transferir_atendente':
+                    # Cliente rejeitou endereço - transferir para atendente humano
+                    logger.info(f"👤 Transferindo cliente para atendente humano: {remetente}")
+                    self.coleta_dados_service.limpar_sessao(remetente)
+                    # Aqui você poderia implementar transferência real
+                
+                elif resultado.get('acao') == 'idade_insuficiente':
+                    # Cliente menor de 18 anos
+                    logger.info(f"🔞 Cliente menor de idade: {remetente}")
+                    self.coleta_dados_service.limpar_sessao(remetente)
+                
+                elif resultado.get('acao') == 'reiniciar_coleta':
+                    # Sessão perdida - limpar e reiniciar
+                    logger.info(f"🔄 Reiniciando coleta para: {remetente}")
+                    self.coleta_dados_service.limpar_sessao(remetente)
+                
+                # Enviar mensagem de erro se disponível
+                if 'mensagem' in resultado:
+                    self.enviar_mensagem(remetente, resultado['mensagem'])
+                
+                return {
+                    "sucesso": False,
+                    "erro": resultado.get('erro', 'Erro no processamento'),
+                    "acao": resultado.get('acao', 'continuar'),
+                    "mensagem_resposta": resultado.get('mensagem', 'Erro processado')
+                }
+            
+        except Exception as e:
+            logger.error(f"❌ Erro na coleta expandida: {e}")
+            
+            # Cleanup em caso de erro
+            if self.coleta_dados_service:
+                self.coleta_dados_service.limpar_sessao(remetente)
+            
+            # Mensagem de erro para o cliente
+            mensagem_erro = """❌ *Erro interno*
+
+Ocorreu um problema técnico. Vou te transferir para um atendente.
+
+📞 Ou entre em contato: *(14) 99999-9999*"""
+            
+            self.enviar_mensagem(remetente, mensagem_erro)
+            
+            return {
+                "sucesso": False,
+                "erro": f"Erro interno: {str(e)}",
+                "mensagem_resposta": "Erro interno - cliente transferido"
+            }
+
+    def _processar_concordancia_lgpd_sim(self, remetente: str, row_id: str) -> Dict[str, Any]:
+        """
+        Processa quando cliente concorda com LGPD e inicia coleta expandida
+        
+        Args:
+            remetente (str): Telefone do cliente
+            row_id (str): ID da opção selecionada
+            
+        Returns:
+            Dict: Resultado do processamento
+        """
+        try:
+            logger.info(f"✅ Cliente concordou com LGPD: {remetente}")
+            
+            # Obter dados da sessão de espera
+            dados_lgpd = None
+            if hasattr(self, 'aguardando_lgpd') and remetente in self.aguardando_lgpd:
+                dados_lgpd = self.aguardando_lgpd[remetente]
+                del self.aguardando_lgpd[remetente]  # Limpar estado de espera
+            
+            if not dados_lgpd:
+                logger.error(f"❌ Dados LGPD não encontrados para {remetente}")
+                return {
+                    "sucesso": False,
+                    "erro": "Sessão LGPD expirada",
+                    "mensagem_resposta": "Sessão expirada. Por favor, informe seu CPF novamente."
+                }
+            
+            cpf = dados_lgpd['cpf']
+            corretor_telefone = dados_lgpd['corretor']
+            nome_cliente = dados_lgpd['nome_cliente'] or "Cliente"
+            
+            # Mensagem de confirmação personalizada
+            mensagem_confirmacao = f"""✅ *Concordância Registrada*
+
+Obrigado {nome_cliente}! Seus dados serão tratados com total segurança.
+
+📋 *Dados Adicionais Necessários*
+
+Para prosseguir com seu atendimento, preciso coletar algumas informações básicas.
+
+Vamos começar:"""
+            
+            # Enviar mensagem de confirmação
+            self.enviar_mensagem(remetente, mensagem_confirmacao)
+            time.sleep(2)
+            
+            # SALVAR CONSENTIMENTO NO SUPABASE
+            if self.consentimento_service:
+                try:
+                    resultado_salvamento = self.consentimento_service.salvar_consentimento_lgpd(
+                        client_cpf=cpf,
+                        client_name=nome_cliente,
+                        client_phone=remetente,
+                        tipo_consentimento="complete",
+                        consent_origin="whatsapp",
+                        whatsapp_message_id=f"menu_lgpd_{int(time.time())}",
+                        notes=f"Cliente concordou via menu LGPD - Row ID: {row_id}"
+                    )
+                    
+                    if resultado_salvamento["success"]:
+                        logger.info(f"💾 Consentimento salvo no Supabase: {resultado_salvamento['action']} - Status: {resultado_salvamento['status']}")
+                    else:
+                        logger.warning(f"⚠️ Falha ao salvar consentimento: {resultado_salvamento['message']}")
+                        
+                except Exception as e_save:
+                    logger.error(f"❌ Erro ao salvar consentimento: {e_save}")
+            
+            # INICIAR COLETA EXPANDIDA
+            if self.coleta_dados_service:
+                try:
+                    # Inicializar sessão de coleta
+                    dados_coleta = self.coleta_dados_service.iniciar_coleta(remetente, nome_cliente, cpf)
+                    
+                    # Solicitar primeiro dado: E-mail
+                    mensagem_email = """📧 *Digite seu e-mail:*
+
+Exemplo: seuemail@gmail.com"""
+                    self.enviar_mensagem(remetente, mensagem_email)
+                    
+                    logger.info(f"📋 Coleta expandida iniciada após concordância LGPD: {remetente}")
+                    
+                    # Notificar corretor sobre o sucesso
+                    if corretor_telefone:
+                        mensagem_corretor = f"""✅ *Cliente concordou com LGPD*
+
+O cliente {nome_cliente} concordou com o tratamento de dados e a coleta automática foi iniciada.
+
+📋 *Status*: Coletando dados adicionais automaticamente
+💾 *Consentimento*: Salvo no sistema automaticamente  
+⏰ *Próximo passo*: Aguardar finalização da coleta"""
+                        
+                        self.enviar_mensagem(corretor_telefone, mensagem_corretor)
+                        logger.info(f"📞 Corretor {corretor_telefone} notificado sobre concordância")
+                    
+                    return {
+                        "sucesso": True,
+                        "acao": "coleta_iniciada",
+                        "tipo_usuario": "cliente",
+                        "mensagem_resposta": "Coleta expandida iniciada",
+                        "dados_lgpd": dados_lgpd,
+                        "row_id_processado": row_id,
+                        "consentimento_salvo": True
+                    }
+                    
+                except Exception as e:
+                    logger.error(f"❌ Erro ao iniciar coleta expandida: {e}")
+                    # Fallback: transferir para corretor
+                    return self._transferir_para_corretor(remetente, corretor_telefone, nome_cliente, "erro_coleta")
+            
+            else:
+                # Serviço de coleta não disponível - transferir para corretor
+                return self._transferir_para_corretor(remetente, corretor_telefone, nome_cliente, "servico_indisponivel")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no processamento de concordância LGPD: {e}")
+            return {
+                "sucesso": False,
+                "erro": f"Erro interno: {str(e)}",
+                "mensagem_resposta": "Erro interno - tente novamente"
+            }
+
+    def _processar_concordancia_lgpd_nao(self, remetente: str, row_id: str) -> Dict[str, Any]:
+        """
+        Processa quando cliente NÃO concorda com LGPD ou quer mais informações
+        
+        Args:
+            remetente (str): Telefone do cliente
+            row_id (str): ID da opção selecionada
+            
+        Returns:
+            Dict: Resultado do processamento
+        """
+        try:
+            logger.info(f"❌ Cliente não concordou com LGPD: {remetente} ({row_id})")
+            
+            # Obter dados da sessão de espera
+            dados_lgpd = None
+            if hasattr(self, 'aguardando_lgpd') and remetente in self.aguardando_lgpd:
+                dados_lgpd = self.aguardando_lgpd[remetente]
+                del self.aguardando_lgpd[remetente]  # Limpar estado de espera
+            
+            corretor_telefone = dados_lgpd.get('corretor') if dados_lgpd else None
+            nome_cliente = dados_lgpd.get('nome_cliente', 'Cliente') if dados_lgpd else 'Cliente'
+            
+            # Mensagem para o cliente
+            mensagem_cliente = """📞 *Atendimento Personalizado*
+
+Entendo sua preocupação com a proteção de dados.
+
+Vou conectar você com um de nossos atendentes especializados que poderá esclarecer todas suas dúvidas e prosseguir com seu atendimento de forma personalizada.
+
+⏰ *Aguarde um momento...*"""
+            
+            self.enviar_mensagem(remetente, mensagem_cliente)
+            
+            # Notificar corretor sobre a recusa
+            if corretor_telefone:
+                if row_id == "mais_informacoes":
+                    motivo = "solicitou mais informações sobre proteção de dados"
+                else:
+                    motivo = "não concordou com o tratamento de dados pessoais"
+                
+                mensagem_corretor = f"""⚠️ *Cliente necessita atendimento personalizado*
+
+*Cliente*: {nome_cliente}
+*Telefone*: {remetente}
+*Situação*: O cliente {motivo}
+
+🔒 *LGPD*: Não foi possível prosseguir com coleta automática
+
+📞 *Ação necessária*: Entre em contato direto para:
+• Esclarecer dúvidas sobre proteção de dados
+• Explicar o processo de forma personalizada  
+• Coletar dados manualmente se cliente concordar
+
+⏰ Cliente foi informado que receberá atendimento personalizado."""
+                
+                self.enviar_mensagem(corretor_telefone, mensagem_corretor)
+                logger.info(f"📞 Corretor {corretor_telefone} notificado sobre necessidade de atendimento personalizado")
+            
+            return {
+                "sucesso": True,
+                "acao": "atendimento_personalizado",
+                "tipo_usuario": "cliente", 
+                "mensagem_resposta": "Cliente direcionado para atendimento personalizado",
+                "motivo": row_id,
+                "corretor_notificado": corretor_telefone is not None,
+                "row_id_processado": row_id
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no processamento de recusa LGPD: {e}")
+            return {
+                "sucesso": False,
+                "erro": f"Erro interno: {str(e)}",
+                "mensagem_resposta": "Erro interno - tente novamente"
+            }
+
+    def _transferir_para_corretor(self, cliente_telefone: str, corretor_telefone: str, nome_cliente: str, motivo: str) -> Dict[str, Any]:
+        """
+        Transfere cliente para atendimento manual do corretor
+        
+        Args:
+            cliente_telefone (str): Telefone do cliente
+            corretor_telefone (str): Telefone do corretor
+            nome_cliente (str): Nome do cliente
+            motivo (str): Motivo da transferência
+            
+        Returns:
+            Dict: Resultado da transferência
+        """
+        try:
+            # Mensagem para o cliente
+            mensagem_cliente = """📞 *Transferindo para Atendente*
+
+Vou conectar você com um de nossos atendentes para prosseguir com seu atendimento de forma personalizada.
+
+⏰ *Aguarde o contato...*"""
+            
+            self.enviar_mensagem(cliente_telefone, mensagem_cliente)
+            
+            # Mensagem para o corretor
+            if corretor_telefone:
+                motivos_amigaveis = {
+                    "erro_coleta": "erro técnico na coleta automática",
+                    "servico_indisponivel": "serviço de coleta temporariamente indisponível",
+                    "sessao_expirada": "sessão de atendimento expirada"
+                }
+                
+                motivo_amigavel = motivos_amigaveis.get(motivo, motivo)
+                
+                mensagem_corretor = f"""🔄 *Transferência de Cliente*
+
+*Cliente*: {nome_cliente}
+*Telefone*: {cliente_telefone}  
+*Motivo*: {motivo_amigavel}
+
+📞 *Ação necessária*: Entre em contato direto para prosseguir com o atendimento manualmente.
+
+⏰ Cliente foi informado sobre a transferência."""
+                
+                self.enviar_mensagem(corretor_telefone, mensagem_corretor)
+                logger.info(f"📞 Cliente transferido para corretor {corretor_telefone}")
+            
+            return {
+                "sucesso": True,
+                "acao": "transferencia_realizada",
+                "motivo": motivo,
+                "corretor_notificado": corretor_telefone is not None
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Erro na transferência: {e}")
+            return {
+                "sucesso": False,
+                "erro": f"Erro na transferência: {str(e)}"
             }
 
     def processar_resposta_menu_colaborador(self, remetente: str, row_id: str, webhook_data: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -778,19 +1224,46 @@ class WhatsAppService:
                 
                 # Ativação da IA Especializada
                 if resultado_processamento["acao"] == "ativar_ia_especializada":
-                    # Criar sessão ativa com timeout para este colaborador
-                    agora = time.time()
-                    self.sessoes_ativas[remetente] = {
-                        "tipo": "ia_especializada",
-                        "dados_colaborador": None,  # Será preenchido quando necessário
-                        "ativado_em": agora,
-                        "expira_em": agora + self.TIMEOUT_SESSAO,
-                        "ultima_atividade": agora
-                    }
-                    logger.info(f"🤖 IA Especializada ATIVADA para colaborador: {remetente} (expira em 30min)")
+                    # CAPTURA: Colaborador escolheu "Usar IA para Dúvidas"
+                    if self.logging_enabled and self.conversation_logger:
+                        try:
+                            conversation_id = self.conversation_logger.get_active_conversation_id(remetente)
+                            if conversation_id:
+                                self.conversation_logger.update_conversation_type(conversation_id, "duvidas")
+                                self.conversation_logger.add_message(
+                                    conversation_id, 
+                                    "user", 
+                                    f"Menu selecionado: Usar IA para Dúvidas (row_id: {row_id})"
+                                )
+                        except Exception as e:
+                            logger.warning(f"⚠️ Erro na captura de menu dúvidas: {e}")
+                    
+                    # MODULARIZADO: Usar SessionManager para criar sessão
+                    resultado_sessao = self.session_manager.criar_sessao_ia_especializada(
+                        telefone=remetente,
+                        dados_colaborador=None  # Será preenchido quando necessário
+                    )
+                    if resultado_sessao["sucesso"]:
+                        logger.info(f"🤖 IA Especializada ATIVADA para colaborador: {remetente} (expira em {resultado_sessao['timeout_minutos']:.1f}min)")
+                    else:
+                        logger.error(f"❌ Erro ao criar sessão IA: {resultado_sessao.get('erro')}")
                 
                 # Início da coleta de dados do cliente
                 elif resultado_processamento["acao"] == "coletar_nome_cliente":
+                    # CAPTURA: Colaborador escolheu "Iniciar Fechamento Locação"
+                    if self.logging_enabled and self.conversation_logger:
+                        try:
+                            conversation_id = self.conversation_logger.get_active_conversation_id(remetente)
+                            if conversation_id:
+                                self.conversation_logger.update_conversation_type(conversation_id, "em_andamento")
+                                self.conversation_logger.add_message(
+                                    conversation_id, 
+                                    "user", 
+                                    f"Menu selecionado: Iniciar Fechamento Locação (row_id: {row_id})"
+                                )
+                        except Exception as e:
+                            logger.warning(f"⚠️ Erro na captura de menu fechamento: {e}")
+                    
                     # Iniciar processo de coleta de dados do cliente
                     self.coleta_dados_cliente[remetente] = {
                         "nome": "",
@@ -799,6 +1272,20 @@ class WhatsAppService:
                         "iniciado_em": time.time()
                     }
                     logger.info(f"📝 Iniciando coleta de dados do cliente para colaborador: {remetente}")
+                
+                # NOVO: Processamento de respostas do menu LGPD
+                elif resultado_processamento["acao"] == "iniciar_processo_completo":
+                    # Cliente concordou com tudo - iniciar coleta expandida
+                    return self._processar_concordancia_lgpd_sim(remetente, "concordo_tudo")
+                
+                elif resultado_processamento["acao"] == "transferir_atendente":
+                    # Cliente quer mais informações - notificar corretor
+                    return self._processar_concordancia_lgpd_nao(remetente, "mais_informacoes")
+                
+                elif resultado_processamento["acao"] == "enviar_politica":
+                    # Cliente quer ler política de privacidade - buscar link dinâmico
+                    self._enviar_politica_privacidade(remetente)
+                    logger.info(f"📄 Política de privacidade enviada para: {remetente}")
                 
                 # Confirmação de atendimento do corretor (SIM)
                 elif resultado_processamento["acao"] == "iniciar_atendimento_cliente":
@@ -909,6 +1396,15 @@ class WhatsAppService:
             if message_id:
                 self.marcar_como_lida(remetente, message_id)
             
+            # CAPTURA: Mensagem do colaborador durante coleta
+            if self.logging_enabled and self.conversation_logger:
+                try:
+                    conversation_id = self.conversation_logger.get_active_conversation_id(remetente)
+                    if conversation_id:
+                        self.conversation_logger.add_message(conversation_id, "user", mensagem)
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro na captura durante coleta: {e}")
+            
             # Obter dados da coleta em andamento
             dados_coleta = self.coleta_dados_cliente[remetente]
             etapa_atual = dados_coleta["etapa"]
@@ -951,17 +1447,16 @@ class WhatsAppService:
                     # Só tratar como dúvida se contiver palavras interrogativas claras
                     if any(palavra in mensagem_lower for palavra in palavras_pergunta):
                         logger.info(f"❓ Dúvida técnica explícita detectada durante coleta: {remetente}")
-                        # Ativar IA especializada temporariamente
-                        agora = time.time()
-                        self.sessoes_ativas[remetente] = {
-                            "tipo": "ia_especializada",
-                            "dados_colaborador": None,
-                            "ativado_em": agora,
-                            "expira_em": agora + self.TIMEOUT_SESSAO,
-                            "ultima_atividade": agora
-                        }
-                        self.enviar_mensagem(remetente, "🤖 IA Especializada Ativada!")
-                        return self.processar_duvida_colaborador(remetente, mensagem, message_id)
+                        # MODULARIZADO: Ativar IA especializada temporariamente usando SessionManager
+                        resultado_sessao = self.session_manager.criar_sessao_ia_especializada(
+                            telefone=remetente,
+                            dados_colaborador=None
+                        )
+                        if resultado_sessao["sucesso"]:
+                            self.enviar_mensagem(remetente, "🤖 IA Especializada Ativada!")
+                            return self.processar_duvida_colaborador(remetente, mensagem, message_id)
+                        else:
+                            logger.error(f"❌ Erro ao criar sessão IA durante coleta: {resultado_sessao.get('erro')}")
                     else:
                         logger.info(f"📝 Dúvida técnica detectada, mas sem palavras interrogativas - continuando coleta")
                         # Continuar com validação normal se não for pergunta clara
@@ -991,6 +1486,15 @@ class WhatsAppService:
                     
                     self.enviar_mensagem(remetente, mensagem_resposta)
                     
+                    # CAPTURA: Resposta da IA para nome válido
+                    if self.logging_enabled and self.conversation_logger:
+                        try:
+                            conversation_id = self.conversation_logger.get_active_conversation_id(remetente)
+                            if conversation_id:
+                                self.conversation_logger.add_message(conversation_id, "assistant", mensagem_resposta)
+                        except Exception as e:
+                            logger.warning(f"⚠️ Erro na captura de resposta nome: {e}")
+                    
                     logger.info(f"✅ Nome válido coletado: {dados_coleta['nome']}")
                     return {
                         "sucesso": True,
@@ -1011,6 +1515,15 @@ class WhatsAppService:
 *Por favor, informe o nome completo do cliente:*"""
                     
                     self.enviar_mensagem(remetente, mensagem_erro)
+                    
+                    # CAPTURA: Mensagem de erro de nome
+                    if self.logging_enabled and self.conversation_logger:
+                        try:
+                            conversation_id = self.conversation_logger.get_active_conversation_id(remetente)
+                            if conversation_id:
+                                self.conversation_logger.add_message(conversation_id, "assistant", mensagem_erro)
+                        except Exception as e:
+                            logger.warning(f"⚠️ Erro na captura de erro nome: {e}")
                     
                     logger.warning(f"❌ Nome inválido rejeitado: {mensagem}")
                     return {
@@ -1037,6 +1550,15 @@ class WhatsAppService:
 📞 *Telefone:* {dados_coleta['telefone']}"""
                     
                     self.enviar_mensagem(remetente, mensagem_final)
+                    
+                    # CAPTURA: Resposta da IA para telefone válido
+                    if self.logging_enabled and self.conversation_logger:
+                        try:
+                            conversation_id = self.conversation_logger.get_active_conversation_id(remetente)
+                            if conversation_id:
+                                self.conversation_logger.add_message(conversation_id, "assistant", mensagem_final)
+                        except Exception as e:
+                            logger.warning(f"⚠️ Erro na captura de resposta telefone: {e}")
                     
                     # Aguardar um momento e enviar menu de confirmação
                     time.sleep(2)
@@ -1132,6 +1654,15 @@ class WhatsAppService:
             logger.info(f"🤖 Processando dúvida de colaborador: {remetente}")
             logger.info(f"💭 Dúvida: {duvida[:100]}...")
             
+            # CAPTURA: Mensagem de dúvida do colaborador
+            if self.logging_enabled and self.conversation_logger:
+                try:
+                    conversation_id = self.conversation_logger.get_active_conversation_id(remetente)
+                    if conversation_id:
+                        self.conversation_logger.add_message(conversation_id, "user", duvida)
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro na captura de dúvida: {e}")
+            
             # Obter dados do colaborador se disponível
             contexto_colaborador = self.sessoes_ativas[remetente].get("dados_colaborador")
             
@@ -1161,6 +1692,15 @@ class WhatsAppService:
                 
                 # Enviar resposta ao colaborador
                 self.enviar_mensagem(remetente, resposta_formatada)
+                
+                # CAPTURA: Resposta da IA para dúvida
+                if self.logging_enabled and self.conversation_logger:
+                    try:
+                        conversation_id = self.conversation_logger.get_active_conversation_id(remetente)
+                        if conversation_id:
+                            self.conversation_logger.add_message(conversation_id, "assistant", resposta_formatada)
+                    except Exception as e:
+                        logger.warning(f"⚠️ Erro na captura de resposta IA: {e}")
                 
                 # Atualizar última interação na sessão
                 if remetente in self.sessoes_ativas:
@@ -1251,7 +1791,6 @@ Peço desculpas pelo inconveniente! 🙏"""
             
             # Tentar obter nome do corretor do banco de dados
             try:
-                from .buscar_usuarios_supabase import identificar_tipo_usuario
                 # TODO: Implementar busca específica do nome do corretor
                 # Por enquanto, usar nome padrão mais profissional
                 logger.info(f"📋 Usando nome padrão para corretor: {corretor_nome}")
@@ -1341,6 +1880,37 @@ Deseja prosseguir com o atendimento?"""
                     if corretor in self.coleta_dados_cliente:
                         del self.coleta_dados_cliente[corretor]
                     
+                    # CAPTURA: Atendimento iniciado com cliente
+                    if self.logging_enabled and self.conversation_logger:
+                        try:
+                            conversation_id = self.conversation_logger.get_active_conversation_id(corretor)
+                            if conversation_id:
+                                # Atualizar dados do cliente na conversa
+                                self.conversation_logger.update_participant_data(
+                                    conversation_id,
+                                    "client",
+                                    {
+                                        "name": dados_cliente['nome'],
+                                        "phone": verificacao["numero"],
+                                        "whatsapp_verified": True
+                                    }
+                                )
+                                
+                                # Adicionar mensagem de conclusão
+                                self.conversation_logger.add_message(
+                                    conversation_id,
+                                    "system",
+                                    f"Atendimento iniciado com cliente {dados_cliente['nome']} - {verificacao['numero']}"
+                                )
+                                
+                                # Finalizar conversa de fechamento
+                                self.conversation_logger.finalize_conversation(
+                                    conversation_id,
+                                    "client_contact_initiated"
+                                )
+                        except Exception as e:
+                            logger.warning(f"⚠️ Erro na captura de finalização: {e}")
+                    
                     logger.info(f"✅ Atendimento iniciado: {corretor} → {dados_cliente['nome']}")
                     
                     return {
@@ -1395,6 +1965,23 @@ Deseja prosseguir com o atendimento?"""
                 logger.info(f"🗑️ Encerrando sessão IA do corretor: {corretor}")
                 del self.sessoes_ativas[corretor]
             
+            # CAPTURA: Finalizar conversa cancelada
+            if self.logging_enabled and self.conversation_logger:
+                try:
+                    conversation_id = self.conversation_logger.get_active_conversation_id(corretor)
+                    if conversation_id:
+                        self.conversation_logger.add_message(
+                            conversation_id, 
+                            "system", 
+                            "Atendimento cancelado pelo corretor"
+                        )
+                        self.conversation_logger.finalize_conversation(
+                            conversation_id, 
+                            "cancelled_by_broker"
+                        )
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro na captura de cancelamento: {e}")
+            
             # Log da operação
             logger.info(f"✅ Atendimento encerrado e dados limpos para: {corretor}")
             
@@ -1408,3 +1995,138 @@ Deseja prosseguir com o atendimento?"""
         except Exception as e:
             logger.error(f"❌ Erro ao processar cancelamento: {str(e)}")
             return {"sucesso": False, "erro_critico": str(e)} 
+
+    def _processar_menu_lgpd(self, from_user: str, message_text: str) -> bool:
+        """
+        Processa as opções do menu LGPD
+        
+        Args:
+            from_user (str): Número do usuário
+            message_text (str): Texto da mensagem
+            
+        Returns:
+            bool: True se processou uma opção válida
+        """
+        
+        opcoes_lgpd = {
+            "1": "concordo_completo",
+            "2": "mais_informacoes", 
+            "3": "dados_pessoais",
+            "4": "documentos",
+            "5": "politica_privacidade"  # Nova opção adicionada
+        }
+        
+        opcao_selecionada = opcoes_lgpd.get(message_text.strip())
+        
+        if opcao_selecionada == "concordo_completo":
+            return self._processar_concordancia_lgpd_sim(from_user)
+            
+        elif opcao_selecionada == "mais_informacoes":
+            return self._processar_concordancia_lgpd_nao(from_user)
+            
+        elif opcao_selecionada == "dados_pessoais":
+            self._enviar_consentimento_dados_pessoais(from_user)
+            return True
+            
+        elif opcao_selecionada == "documentos":
+            self._enviar_consentimento_documentos(from_user)
+            return True
+            
+        elif opcao_selecionada == "politica_privacidade":
+            self._enviar_politica_privacidade(from_user)
+            return True
+            
+        return False
+
+    def _enviar_politica_privacidade(self, from_user: str):
+        """
+        Envia a política de privacidade com link dinâmico do Supabase
+        
+        Args:
+            from_user (str): Número do usuário
+        """
+        try:
+            # Buscar política no Supabase usando a instância já criada
+            if self.consentimento_service:
+                mensagem_politica = self.consentimento_service.gerar_mensagem_politica_privacidade()
+            else:
+                # Fallback caso o serviço não esteja disponível
+                mensagem_politica = self._gerar_politica_fallback()
+            
+            # Enviar mensagem com política
+            self.whatsapp_api.enviar_mensagem(from_user, mensagem_politica)
+            
+            # Log para acompanhamento
+            logger.info(f"📄 Política de privacidade enviada para: {from_user}")
+            
+            # Aguardar 2 segundos e reenviar menu LGPD diretamente
+            import time
+            time.sleep(1)
+            
+            # Chamar diretamente o método enviar_menu_concordancia_dados
+            self.menu_service.enviar_menu_concordancia_dados(from_user)
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao enviar política de privacidade: {e}")
+            
+            # Fallback: enviar link padrão
+            mensagem_fallback = """📄 **Política de Privacidade - Toca Imóveis**
+
+🔗 **Link para acesso**: https://tocaimoveis.com.br/politica-privacidade
+
+Nossa política detalha como tratamos seus dados pessoais conforme a LGPD.
+
+⬅️ *Volte para continuar seu atendimento após a leitura.*"""
+            
+            self.whatsapp_api.enviar_mensagem(from_user, mensagem_fallback)
+
+
+    def _gerar_politica_fallback(self) -> str:
+        """
+        Gera política de privacidade completa como fallback quando ConsentimentoService não está disponível
+        
+        Returns:
+            str: Política de privacidade completa formatada
+        """
+        return """📄 **Política de Privacidade para Coleta de Dados e Documentos via WhatsApp**
+
+**1. Introdução**
+Esta Política de Privacidade tem como objetivo informar como coletamos, utilizamos, armazenamos e protegemos os dados pessoais e documentos enviados por nossos clientes através do WhatsApp, em conformidade com a Lei nº 13.709/2018 (LGPD).
+
+**2. Dados Coletados**
+Coletamos informações pessoais e documentos que podem incluir:
+• Nome completo
+• CPF/RG ou outros documentos de identificação
+• Endereço
+• Dados de contato (telefone, e-mail, etc.)
+• Outros dados e documentos necessários para a prestação dos nossos serviços
+
+**3. Finalidade da Coleta**
+Os dados e documentos coletados via WhatsApp serão utilizados exclusivamente para:
+• Identificação do cliente
+• Análise de informações para prestação de serviços contratados
+• Cumprimento de obrigações legais e regulatórias
+• Comunicação relacionada aos serviços prestados
+
+**4. Compartilhamento de Dados**
+Seus dados poderão ser compartilhados apenas com terceiros necessários para a execução do serviço, sempre observando a confidencialidade e segurança das informações.
+
+**5. Armazenamento e Segurança**
+Seus dados e documentos serão armazenados em ambiente seguro e controlado, sendo adotadas medidas técnicas e administrativas para proteger suas informações contra acessos não autorizados, situações acidentais ou ilícitas de destruição, perda, alteração, comunicação ou difusão.
+
+**6. Direitos dos Titulares**
+Você pode, a qualquer momento, solicitar:
+• Confirmação da existência de tratamento
+• Acesso aos seus dados
+• Correção de dados incompletos, inexatos ou desatualizados
+• Anonimização, bloqueio ou eliminação de dados desnecessários ou excessivos
+• Portabilidade dos dados a outro fornecedor de serviço, mediante requisição expressa
+• Eliminação dos dados tratados com seu consentimento, exceto nas hipóteses previstas em lei
+
+**7. Contato**
+Para exercer seus direitos ou em caso de dúvidas sobre esta Política, entre em contato conosco através do WhatsApp.
+
+**8. Atualizações**
+Esta Política pode ser atualizada a qualquer momento para garantir nossa conformidade com a LGPD.
+
+⬅️ *Volte para continuar seu atendimento após a leitura.*"""

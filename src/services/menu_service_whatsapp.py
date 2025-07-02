@@ -164,8 +164,6 @@ class MenuServiceWhatsApp:
                 "usuario_id": usuario_id
             }
 
-
-
     # Menu de LGPD
     def enviar_menu_concordancia_dados(self, numero_telefone: str) -> Dict[str, Any]:
         """
@@ -191,6 +189,21 @@ class MenuServiceWhatsApp:
                 "buttonText": "Ver Opções",
                 "footerText": "Toca Imóveis - Locação Sem Fiador",
                 "sections": [
+                    {
+                        "title": "✅ Concordância Completa",
+                        "rows": [
+                            {
+                                "title": "Concordo com tudo e prosseguir",
+                                "description": "Aceito todos os termos e quero iniciar o processo",
+                                "rowId": "concordo_tudo"
+                            },
+                            {
+                                "title": "Preciso de mais informações",
+                                "description": "Falar com atendente antes de concordar",
+                                "rowId": "mais_informacoes"
+                            }
+                        ]
+                    },
                     {
                         "title": "📄 Dados Pessoais",
                         "rows": [
@@ -218,21 +231,6 @@ class MenuServiceWhatsApp:
                                 "title": "Ver lista de documentos",
                                 "description": "Consultar quais documentos serão solicitados",
                                 "rowId": "lista_documentos"
-                            }
-                        ]
-                    },
-                    {
-                        "title": "✅ Concordância Completa",
-                        "rows": [
-                            {
-                                "title": "Concordo com tudo e prosseguir",
-                                "description": "Aceito todos os termos e quero iniciar o processo",
-                                "rowId": "concordo_tudo"
-                            },
-                            {
-                                "title": "Preciso de mais informações",
-                                "description": "Falar com atendente antes de concordar",
-                                "rowId": "mais_informacoes"
                             }
                         ]
                     }
@@ -478,11 +476,11 @@ class MenuServiceWhatsApp:
     # Menu de Confirmação do Cliente
     def enviar_menu_confirmacao_cliente(self, numero_telefone: str, corretor_nome: str) -> Dict[str, Any]:
         """
-        Envia menu de confirmação para o cliente aceitar o atendimento
+        Envia menu de confirmação para o cliente sobre aceitar atendimento do corretor
         
         Args:
             numero_telefone (str): Número do telefone do cliente
-            corretor_nome (str): Nome do corretor que solicitou
+            corretor_nome (str): Nome do corretor
             
         Returns:
             Dict: Resposta da API
@@ -496,28 +494,28 @@ class MenuServiceWhatsApp:
             
             payload = {
                 "phone": numero_telefone,
-                "title": "🏠 Atendimento Toca Imóveis",
-                "description": f"O corretor {corretor_nome} solicitou iniciar o processo de fechamento de locação com você. Deseja prosseguir?",
-                "buttonText": "Responder",
+                "title": "🏢 Confirmação de Atendimento",
+                "description": f"O corretor {corretor_nome} da Toca Imóveis está pronto para atendê-lo. Deseja prosseguir?",
+                "buttonText": "Escolher",
                 "footerText": "Toca Imóveis - Locação Sem Fiador",
                 "sections": [
                     {
-                        "title": "Sua resposta:",
+                        "title": "Opções de Atendimento",
                         "rows": [
                             {
-                                "title": "✅ Sim",
-                                "description": "Aceitar e prosseguir com locação",
+                                "title": "✅ Sim, aceito o atendimento",
+                                "description": "Prosseguir com o corretor",
                                 "rowId": "cliente_aceita_atendimento"
                             },
                             {
-                                "title": "❌ Não",
-                                "description": "Não tenho interesse no momento",
+                                "title": "❌ Não, não aceito",
+                                "description": "Encerrar atendimento",
                                 "rowId": "cliente_recusa_atendimento"
                             }
                         ]
                     }
                 ],
-                "delayMessage": 1
+                "delayMessage": 2
             }
             
             response = requests.post(url, json=payload, headers=self.headers, params=params)
@@ -530,7 +528,7 @@ class MenuServiceWhatsApp:
                     "status_code": response.status_code
                 }
             else:
-                logger.error(f"❌ Erro ao enviar menu: {response.status_code}")
+                logger.error(f"❌ Erro ao enviar menu do cliente: {response.status_code}")
                 return {
                     "sucesso": False,
                     "erro": response.text,

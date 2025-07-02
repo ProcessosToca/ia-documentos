@@ -1,8 +1,9 @@
 import os
+import re
+import json
 from openai import OpenAI
 from typing import Dict, Any, List
 import logging
-import json
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
@@ -141,7 +142,7 @@ class OpenAIService:
             for doc in documentos_faltantes:
                 nome = doc.get('name', 'Documento não identificado')
                 descricao = doc.get('description', 'Sem descrição')
-                docs_faltantes_lista.append(f"📄 **{nome}** - {descricao}")
+                docs_faltantes_lista.append(f"📄 *{nome}* - {descricao}")
             
             # Preparar lista de documentos recebidos
             docs_recebidos_lista = []
@@ -241,7 +242,6 @@ class OpenAIService:
                 # Se contém estrutura JSON parcial, tentar extrair a mensagem
                 if '"proxima_mensagem"' in resposta_texto:
                     try:
-                        import re
                         # Buscar o conteúdo da proxima_mensagem
                         match = re.search(r'"proxima_mensagem":\s*"([^"]*)"', resposta_texto)
                         if match:
@@ -701,7 +701,6 @@ SEMPRE retorne JSON válido sem texto adicional."""
                 
                 # Tentar extrair pelo menos a resposta principal
                 if '"resposta"' in resposta_limpa:
-                    import re
                     match = re.search(r'"resposta":\s*"([^"]*)"', resposta_limpa)
                     if match:
                         resposta_limpa = match.group(1).replace('\\n', '\n')
