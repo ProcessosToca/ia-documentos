@@ -1,6 +1,12 @@
 """
-Módulo ConversationLogger - Sistema de Captura de Conversas
-===========================================================
+Módulo ConversationLogger - Sistema de Captura de Conversas (V2)
+================================================================
+
+VERSÃO 2.0 - MELHORIAS INCREMENTAIS:
+- ✅ Classificação específica de sender/receiver
+- ✅ Fases de conversa separadas  
+- ✅ Contexto melhorado
+- ✅ 100% compatível com código existente
 
 Responsável por capturar, estruturar e salvar todas as conversas entre:
 - IA ↔ Cliente  
@@ -8,13 +14,14 @@ Responsável por capturar, estruturar e salvar todas as conversas entre:
 
 Funcionalidades:
 - Captura em tempo real
-- Classificação automática
-- Salvamento em JSON estruturado
+- Classificação automática ESPECÍFICA
+- Salvamento em JSON estruturado com FASES
 - Gestão de arquivos por tipo
 - Integração não-invasiva
+- RETROCOMPATIBILIDADE total
 
 Autor: Sistema IA Toca Imóveis
-Data:  JUlho/2025
+Data:  Julho/2025 - V2.0
 """
 
 import os
@@ -30,7 +37,14 @@ logger = logging.getLogger(__name__)
 
 class ConversationLogger:
     """
-    Sistema profissional de captura de conversas
+    Sistema profissional de captura de conversas V2.0
+    
+    MELHORIAS V2:
+    - Classificação específica (ia_corretor, ia_cliente, corretor, cliente)
+    - Fases de conversa separadas
+    - Contexto melhorado
+    - Detecção automática de tipo de interação
+    - Estrutura preparada para Supabase
     
     Gerencia todo o ciclo de vida das conversas:
     1. Criação de nova conversa
@@ -42,7 +56,7 @@ class ConversationLogger:
     
     def __init__(self, base_path: str = "conversations_logs"):
         """
-        Inicializa o ConversationLogger
+        Inicializa o ConversationLogger V2
         
         Args:
             base_path (str): Caminho base para salvamento dos JSONs
@@ -54,7 +68,7 @@ class ConversationLogger:
         # Garantir que as pastas existem
         self._ensure_directories()
         
-        logger.info("🗂️ ConversationLogger inicializado")
+        logger.info("🗂️ ConversationLogger V2.0 inicializado com melhorias")
     
     def _ensure_directories(self):
         """Garante que todas as pastas necessárias existem"""
@@ -88,7 +102,7 @@ class ConversationLogger:
             # Gerar ID único
             conversation_id = f"conv_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
             
-            # Estrutura base do JSON
+            # ✅ ESTRUTURA MELHORADA V2 - Mantendo compatibilidade
             conversation_data = {
                 "conversation_info": {
                     "id": conversation_id,
@@ -96,7 +110,11 @@ class ConversationLogger:
                     "status": "active",
                     "start_time": datetime.now().isoformat(),
                     "last_updated": datetime.now().isoformat(),
-                    "phone_number": phone_number
+                    "phone_number": phone_number,
+                    # ✅ NOVOS CAMPOS V2
+                    "version": "2.0",
+                    "current_phase": "ia_corretor",  # Fase atual da conversa
+                    "business_context": "rental_process"
                 },
                 "participants": {
                     "broker": participant_data,
@@ -112,13 +130,37 @@ class ConversationLogger:
                     "ai_messages": 0,
                     "user_messages": 0,
                     "duration_seconds": 0,
-                    "classification_changes": []
+                    "classification_changes": [],
+                    # ✅ NOVOS CAMPOS V2
+                    "phases_count": 1,
+                    "specific_interactions": {
+                        "ia_corretor": 0,
+                        "ia_cliente": 0,
+                        "corretor_ia": 0,
+                        "cliente_ia": 0
+                    }
                 },
-                "messages": [],
+                "messages": [],  # ✅ MANTIDO para compatibilidade
+                # ✅ NOVA ESTRUTURA V2 - Fases separadas
+                "conversation_phases": {
+                    "current": "ia_corretor",
+                    "phases": {
+                        "ia_corretor": {
+                            "started_at": datetime.now().isoformat(),
+                            "ended_at": None,
+                            "message_count": 0,
+                            "classification": conversation_type,
+                            "messages": []  # Mensagens específicas desta fase
+                        }
+                    }
+                },
                 "metadata": {
                     "platform": "whatsapp",
-                    "system_version": "1.0",
-                    "created_by": "conversation_logger"
+                    "system_version": "2.0",
+                    "created_by": "conversation_logger_v2",
+                    # ✅ NOVOS METADADOS V2
+                    "improvements": ["specific_classification", "phase_separation", "context_awareness"],
+                    "supabase_ready": True
                 }
             }
             
@@ -128,7 +170,7 @@ class ConversationLogger:
             # Salvar arquivo inicial
             self._save_conversation(conversation_id, conversation_type)
             
-            logger.info(f"🆕 Nova conversa iniciada: {conversation_id} (tipo: {conversation_type})")
+            logger.info(f"🆕 Nova conversa V2 iniciada: {conversation_id} (tipo: {conversation_type}, fase: ia_corretor)")
             return conversation_id
             
         except Exception as e:
@@ -142,11 +184,11 @@ class ConversationLogger:
                    message_type: str = "text",
                    metadata: Dict[str, Any] = None) -> bool:
         """
-        Registra uma nova mensagem na conversa
+        Registra uma nova mensagem na conversa com classificação melhorada
         
         Args:
             conversation_id (str): ID da conversa
-            sender (str): Quem enviou ("cliente", "corretor", "ia")
+            sender (str): Quem enviou ("cliente", "corretor", "ia", "user", "assistant")
             content (str): Conteúdo da mensagem
             message_type (str): Tipo da mensagem
             metadata (dict): Metadados adicionais
@@ -158,26 +200,51 @@ class ConversationLogger:
             if not self.enabled or conversation_id not in self.active_conversations:
                 return False
             
-            # Criar estrutura da mensagem
+            conversation = self.active_conversations[conversation_id]
+            
+            # ✅ MELHORAR CLASSIFICAÇÃO V2 - Manter compatibilidade
+            specific_sender, specific_receiver = self._classify_interaction_v2(
+                sender, conversation
+            )
+            
+            # ✅ ESTRUTURA DE MENSAGEM MELHORADA V2
             message = {
-                "id": f"msg_{len(self.active_conversations[conversation_id]['messages']) + 1:03d}",
+                "id": f"msg_{len(conversation['messages']) + 1:03d}",
                 "timestamp": datetime.now().isoformat(),
+                # ✅ COMPATIBILIDADE: Manter campo original
                 "sender": sender,
                 "content": content,
                 "message_type": message_type,
-                "metadata": metadata or {}
+                "metadata": metadata or {},
+                # ✅ NOVOS CAMPOS V2 - Classificação específica
+                "sender_specific": specific_sender,
+                "receiver_specific": specific_receiver,
+                "interaction_type": f"{specific_sender}_{specific_receiver}",
+                "phase": conversation["conversation_info"]["current_phase"]
             }
             
-            # Adicionar à conversa
-            conversation = self.active_conversations[conversation_id]
-            conversation["messages"].append(message)
+            # ✅ ADICIONAR às duas estruturas (compatibilidade + melhoria)
+            conversation["messages"].append(message)  # Original
             
-            # Atualizar estatísticas
+            # ✅ ADICIONAR à fase específica
+            current_phase = conversation["conversation_info"]["current_phase"]
+            if current_phase in conversation["conversation_phases"]["phases"]:
+                conversation["conversation_phases"]["phases"][current_phase]["messages"].append(message)
+                conversation["conversation_phases"]["phases"][current_phase]["message_count"] += 1
+            
+            # ✅ ATUALIZAR ESTATÍSTICAS MELHORADAS
             conversation["conversation_summary"]["total_messages"] += 1
-            if sender == "ia":
+            
+            # Estatísticas originais (compatibilidade)
+            if sender == "ia" or sender == "assistant":
                 conversation["conversation_summary"]["ai_messages"] += 1
             else:
                 conversation["conversation_summary"]["user_messages"] += 1
+            
+            # ✅ NOVAS ESTATÍSTICAS V2
+            interaction_key = f"{specific_sender}_{specific_receiver}"
+            if interaction_key in ["ia_corretor", "ia_cliente", "corretor_ia", "cliente_ia"]:
+                conversation["conversation_summary"]["specific_interactions"][interaction_key] += 1
             
             conversation["conversation_info"]["last_updated"] = datetime.now().isoformat()
             
@@ -185,11 +252,116 @@ class ConversationLogger:
             conversation_type = conversation["conversation_info"]["type"]
             self._save_conversation(conversation_id, conversation_type)
             
-            logger.info(f"💬 Mensagem registrada: {conversation_id} ({sender})")
+            logger.info(f"💬 Mensagem V2 registrada: {conversation_id} ({specific_sender}→{specific_receiver})")
             return True
             
         except Exception as e:
             logger.error(f"❌ Erro ao registrar mensagem: {str(e)}")
+            return False
+    
+    def _classify_interaction_v2(self, original_sender: str, conversation: Dict) -> tuple:
+        """
+        ✅ NOVO V2: Classifica de forma específica quem está falando com quem
+        
+        Args:
+            original_sender (str): Sender original do sistema
+            conversation (Dict): Dados da conversa
+            
+        Returns:
+            tuple: (sender_specific, receiver_specific)
+        """
+        current_phase = conversation["conversation_info"]["current_phase"]
+        
+        # Mapeamento inteligente baseado no contexto
+        if original_sender in ["user"]:
+            if current_phase == "ia_corretor":
+                return ("corretor", "ia")
+            elif current_phase == "ia_cliente":
+                return ("cliente", "ia")
+            else:
+                return ("corretor", "ia")  # Default para compatibilidade
+                
+        elif original_sender in ["assistant", "ia"]:
+            if current_phase == "ia_corretor":
+                return ("ia", "corretor")
+            elif current_phase == "ia_cliente":
+                return ("ia", "cliente")
+            else:
+                return ("ia", "corretor")  # Default para compatibilidade
+                
+        elif original_sender == "system":
+            return ("system", "all")
+            
+        elif original_sender == "corretor":
+            return ("corretor", "ia")
+            
+        elif original_sender == "cliente":
+            return ("cliente", "ia")
+            
+        else:
+            # Fallback para tipos não mapeados
+            return (original_sender, "unknown")
+    
+    def transition_phase(self, conversation_id: str, new_phase: str, reason: str = "automatic") -> bool:
+        """
+        ✅ NOVO V2: Gerencia transição entre fases da conversa
+        
+        Args:
+            conversation_id (str): ID da conversa
+            new_phase (str): Nova fase ("ia_cliente", "ia_corretor")
+            reason (str): Motivo da transição
+            
+        Returns:
+            bool: True se transição foi bem-sucedida
+        """
+        try:
+            if conversation_id not in self.active_conversations:
+                return False
+            
+            conversation = self.active_conversations[conversation_id]
+            old_phase = conversation["conversation_info"]["current_phase"]
+            
+            if old_phase == new_phase:
+                return True  # Já está na fase correta
+            
+            # Finalizar fase atual
+            if old_phase in conversation["conversation_phases"]["phases"]:
+                conversation["conversation_phases"]["phases"][old_phase]["ended_at"] = datetime.now().isoformat()
+            
+            # Iniciar nova fase
+            conversation["conversation_info"]["current_phase"] = new_phase
+            conversation["conversation_phases"]["current"] = new_phase
+            
+            if new_phase not in conversation["conversation_phases"]["phases"]:
+                conversation["conversation_phases"]["phases"][new_phase] = {
+                    "started_at": datetime.now().isoformat(),
+                    "ended_at": None,
+                    "message_count": 0,
+                    "classification": conversation["conversation_info"]["type"],
+                    "messages": []
+                }
+                conversation["conversation_summary"]["phases_count"] += 1
+            
+            # Registrar transição
+            conversation["conversation_summary"]["classification_changes"].append({
+                "timestamp": datetime.now().isoformat(),
+                "from_phase": old_phase,
+                "to_phase": new_phase,
+                "reason": reason,
+                "type": "phase_transition"
+            })
+            
+            conversation["conversation_info"]["last_updated"] = datetime.now().isoformat()
+            
+            # Salvar atualização
+            conversation_type = conversation["conversation_info"]["type"]
+            self._save_conversation(conversation_id, conversation_type)
+            
+            logger.info(f"🔄 Transição de fase: {conversation_id} ({old_phase} → {new_phase}) - {reason}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Erro na transição de fase: {str(e)}")
             return False
     
     def finalize_conversation(self, conversation_id: str, finalization_reason: str = "completed") -> bool:
@@ -382,7 +554,7 @@ class ConversationLogger:
     
     def add_message(self, conversation_id: str, role: str, content: str) -> bool:
         """
-        Alias para log_message com parâmetros simplificados
+        ✅ COMPATIBILIDADE V2: Alias para log_message com parâmetros simplificados
         
         Args:
             conversation_id (str): ID da conversa
@@ -393,6 +565,39 @@ class ConversationLogger:
             bool: True se adicionou com sucesso
         """
         return self.log_message(conversation_id, role, content)
+    
+    def add_message_enhanced(self, conversation_id: str, sender: str, receiver: str, content: str, phase: str = None) -> bool:
+        """
+        ✅ NOVO V2: Método avançado com classificação específica
+        
+        Args:
+            conversation_id (str): ID da conversa
+            sender (str): Quem envia ("ia", "corretor", "cliente")
+            receiver (str): Quem recebe ("ia", "corretor", "cliente") 
+            content (str): Conteúdo da mensagem
+            phase (str): Fase específica (opcional)
+            
+        Returns:
+            bool: True se adicionou com sucesso
+        """
+        try:
+            # Se fase especificada, fazer transição se necessário
+            if phase and conversation_id in self.active_conversations:
+                current_phase = self.active_conversations[conversation_id]["conversation_info"]["current_phase"]
+                if current_phase != phase:
+                    self.transition_phase(conversation_id, phase, "explicit_phase_change")
+            
+            # Usar log_message com sender específico
+            metadata = {
+                "receiver_explicit": receiver,
+                "enhanced_method": True
+            }
+            
+            return self.log_message(conversation_id, sender, content, "text", metadata)
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no add_message_enhanced: {str(e)}")
+            return False
     
     def get_active_conversation_id(self, phone_number: str) -> Optional[str]:
         """
