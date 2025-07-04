@@ -426,15 +426,10 @@ Digite o complemento ou:
         dados.dados_completos = True
         dados.timestamp_conclusao = datetime.now().isoformat()
         
-        # Gerar resumo final
-        resumo = self._gerar_resumo_final(dados)
+        # Processar finalização completa (salvar cliente + criar negociação)
+        resultado_final = self.processar_finalizacao_coleta(dados)
         
-        return {
-            'sucesso': True,
-            'coleta_finalizada': True,
-            'dados_completos': asdict(dados),
-            'mensagem': resumo
-        }
+        return resultado_final
     
     def _gerar_resumo_final(self, dados: DadosCliente) -> str:
         """Gera resumo final dos dados coletados"""
@@ -456,6 +451,269 @@ Digite o complemento ou:
 {endereco_completo}
 
 ⏰ *Aguarde que vou transferir você para o corretor responsável...*"""
+    
+    def salvar_cliente_supabase(self, dados: DadosCliente) -> Dict:
+        """
+        Salva cliente na tabela 'clientes' do Supabase (com verificação de duplicata)
+        
+        Args:
+            dados (DadosCliente): Dados completos do cliente
+            
+        Returns:
+            Dict: Resultado da operação com ID do cliente se sucesso
+        """
+        try:
+            # Importar Supabase
+            from src.services.buscar_usuarios_supabase import obter_cliente_supabase
+            
+            supabase = obter_cliente_supabase()
+            
+            # 1. Verificar se cliente já existe por CPF
+            logger.info(f"🔍 Verificando se cliente já existe: CPF {dados.cpf}")
+            existing_client = supabase.table('clientes').select('*').eq('cpf', dados.cpf).execute()
+            
+            if existing_client.data:
+                # Cliente já existe - atualizar dados
+                cliente_existente = existing_client.data[0]
+                cliente_id = cliente_existente['id']
+                
+                logger.info(f"🔄 Cliente já existe, atualizando dados: {cliente_id}")
+                
+                # Preparar dados para atualização
+                endereco_completo = f"{dados.rua}, {dados.numero}"
+                if dados.complemento:
+                    endereco_completo += f", {dados.complemento}"
+                
+                update_data = {
+                    "nome": dados.nome,
+                    "email": dados.email,
+                    "telefone": dados.telefone,
+                    "data_nascimento": dados.data_nascimento,
+                    "endereco": endereco_completo,
+                    "cidade": dados.cidade,
+                    "estado": dados.uf,
+                    "cep": dados.cep,
+                    "updated_at": "now()"
+                }
+                
+                # Atualizar registro existente
+                result = supabase.table('clientes').update(update_data).eq('id', cliente_id).execute()
+                
+                if result.data:
+                    logger.info(f"✅ Cliente atualizado com sucesso! ID: {cliente_id}")
+                    return {
+                        'sucesso': True,
+                        'cliente_id': cliente_id,
+                        'mensagem': 'Dados do cliente atualizados com sucesso',
+                        'dados_salvos': result.data[0],
+                        'acao': 'atualizado'
+                    }
+            
+            # 2. Cliente não existe - criar novo
+            logger.info(f"💾 Criando novo cliente no Supabase: {dados.nome}")
+            
+            # Preparar dados para inserção
+            endereco_completo = f"{dados.rua}, {dados.numero}"
+            if dados.complemento:
+                endereco_completo += f", {dados.complemento}"
+            
+            cliente_data = {
+                "nome": dados.nome,
+                "cpf": dados.cpf,
+                "email": dados.email,
+                "telefone": dados.telefone,
+                "data_nascimento": dados.data_nascimento,
+                "endereco": endereco_completo,
+                "cidade": dados.cidade,
+                "estado": dados.uf,
+                "cep": dados.cep
+            }
+            
+            # Inserir no Supabase
+            result = supabase.table('clientes').insert(cliente_data).execute()
+            
+            if result.data:
+                cliente_id = result.data[0]['id']
+                logger.info(f"✅ Cliente criado com sucesso! ID: {cliente_id}")
+                
+                return {
+                    'sucesso': True,
+                    'cliente_id': cliente_id,
+                    'mensagem': 'Cliente cadastrado com sucesso',
+                    'dados_salvos': result.data[0],
+                    'acao': 'criado'
+                }
+            else:
+                logger.error("❌ Falha ao salvar cliente - sem dados de retorno")
+                return {
+                    'sucesso': False,
+                    'erro': 'Falha ao salvar - sem dados de retorno',
+                    'mensagem': 'Erro interno ao cadastrar cliente'
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Erro ao salvar cliente no Supabase: {e}")
+            
+            # Verificar se é erro de CPF duplicado
+            error_str = str(e)
+            if 'duplicate key value violates unique constraint' in error_str and 'cpf' in error_str:
+                return {
+                    'sucesso': False,
+                    'erro': 'CPF já cadastrado no sistema',
+                    'mensagem': 'Este CPF já está cadastrado. Verificando dados existentes...',
+                    'tipo_erro': 'cpf_duplicado'
+                }
+            
+            return {
+                'sucesso': False,
+                'erro': str(e),
+                'mensagem': 'Erro interno ao cadastrar cliente'
+            }
+    
+    def criar_negociacao_cliente(self, dados: DadosCliente, cliente_id: str = None) -> Dict:
+        """
+        Cria negociação na tabela 'ai_negotiations' do Supabase
+        
+        Args:
+            dados (DadosCliente): Dados do cliente
+            cliente_id (str, optional): ID do cliente na tabela clientes
+            
+        Returns:
+            Dict: Resultado da operação com ID da negociação se sucesso
+        """
+        try:
+            # Importar Supabase
+            from src.services.buscar_usuarios_supabase import obter_cliente_supabase
+            
+            supabase = obter_cliente_supabase()
+            
+            # Preparar endereço completo para metadata
+            endereco_completo = f"{dados.rua}, {dados.numero}"
+            if dados.complemento:
+                endereco_completo += f", {dados.complemento}"
+            endereco_completo += f", {dados.bairro}, {dados.cidade}/{dados.uf}, CEP: {dados.cep}"
+            
+            # Preparar dados para inserção
+            negociacao_data = {
+                "client_name": dados.nome,
+                "client_phone": dados.telefone,
+                "client_email": dados.email,
+                "client_cpf": dados.cpf,
+                "rental_modality": "residencial",
+                "status": "coletando_documentos",  # Próximo passo após coleta
+                "metadata": {
+                    "origem": "coleta_expandida_whatsapp",
+                    "dados_completos": True,
+                    "endereco_completo": endereco_completo,
+                    "idade": dados.idade,
+                    "timestamp_conclusao_coleta": dados.timestamp_conclusao
+                }
+            }
+            
+            # Adicionar cliente_id se fornecido
+            if cliente_id:
+                negociacao_data["metadata"]["cliente_id"] = cliente_id
+            
+            logger.info(f"📋 Criando negociação no Supabase para: {dados.nome}")
+            
+            # Inserir no Supabase
+            result = supabase.table('ai_negotiations').insert(negociacao_data).execute()
+            
+            if result.data:
+                negociacao_id = result.data[0]['id']
+                logger.info(f"✅ Negociação criada com sucesso! ID: {negociacao_id}")
+                
+                return {
+                    'sucesso': True,
+                    'negociacao_id': negociacao_id,
+                    'mensagem': 'Negociação iniciada com sucesso',
+                    'dados_salvos': result.data[0]
+                }
+            else:
+                logger.error("❌ Falha ao criar negociação - sem dados de retorno")
+                return {
+                    'sucesso': False,
+                    'erro': 'Falha ao criar negociação - sem dados de retorno',
+                    'mensagem': 'Erro interno ao iniciar negociação'
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Erro ao criar negociação no Supabase: {e}")
+            return {
+                'sucesso': False,
+                'erro': str(e),
+                'mensagem': 'Erro interno ao iniciar negociação'
+            }
+    
+    def processar_finalizacao_coleta(self, dados: DadosCliente) -> Dict:
+        """
+        Processa a finalização completa da coleta: salva cliente e cria negociação
+        
+        Args:
+            dados (DadosCliente): Dados completos coletados
+            
+        Returns:
+            Dict: Resultado completo do processamento
+        """
+        logger.info(f"🎯 Iniciando finalização completa da coleta para: {dados.nome}")
+        
+        resultado_final = {
+            'sucesso': True,
+            'coleta_finalizada': True,
+            'cliente_salvo': False,
+            'negociacao_criada': False,
+            'dados_completos': asdict(dados),
+            'erros': []
+        }
+        
+        # 1. Salvar cliente
+        resultado_cliente = self.salvar_cliente_supabase(dados)
+        
+        if resultado_cliente['sucesso']:
+            resultado_final['cliente_salvo'] = True
+            resultado_final['cliente_id'] = resultado_cliente['cliente_id']
+            logger.info(f"✅ Cliente salvo: {resultado_cliente['cliente_id']}")
+            
+            # 2. Criar negociação (usando o ID do cliente)
+            resultado_negociacao = self.criar_negociacao_cliente(
+                dados, 
+                cliente_id=resultado_cliente['cliente_id']
+            )
+            
+            if resultado_negociacao['sucesso']:
+                resultado_final['negociacao_criada'] = True
+                resultado_final['negociacao_id'] = resultado_negociacao['negociacao_id']
+                logger.info(f"✅ Negociação criada: {resultado_negociacao['negociacao_id']}")
+            else:
+                resultado_final['erros'].append({
+                    'tipo': 'negociacao',
+                    'erro': resultado_negociacao['erro']
+                })
+                logger.warning(f"⚠️ Cliente salvo mas falha na negociação: {resultado_negociacao['erro']}")
+        else:
+            resultado_final['sucesso'] = False
+            resultado_final['erros'].append({
+                'tipo': 'cliente',
+                'erro': resultado_cliente['erro']
+            })
+            logger.error(f"❌ Falha ao salvar cliente: {resultado_cliente['erro']}")
+        
+        # 3. Gerar mensagem final
+        if resultado_final['cliente_salvo'] and resultado_final['negociacao_criada']:
+            resultado_final['mensagem'] = self._gerar_resumo_final(dados)
+            logger.info("🎉 Finalização completa realizada com sucesso!")
+        elif resultado_final['cliente_salvo']:
+            resultado_final['mensagem'] = self._gerar_resumo_final(dados) + "\n\n⚠️ *Observação: Cliente cadastrado, mas houve problema na criação da negociação.*"
+            logger.warning("⚠️ Finalização parcial - cliente salvo mas negociação falhou")
+        else:
+            resultado_final['mensagem'] = """❌ *Erro ao finalizar cadastro*
+
+Ocorreu um problema ao salvar seus dados. Vou transferir você para um atendente que finalizará seu cadastro manualmente.
+
+⏰ *Aguarde o contato...*"""
+            logger.error("❌ Finalização falhou completamente")
+        
+        return resultado_final
     
     def _buscar_endereco_viacep(self, cep: str) -> Dict:
         """

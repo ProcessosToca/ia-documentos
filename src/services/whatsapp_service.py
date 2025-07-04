@@ -848,16 +848,29 @@ Não foi possível prosseguir com a coleta automática. Entre em contato diretam
                     # Obter dados completos
                     dados_completos = resultado.get('dados_completos', {})
                     
+                    # Verificar resultados do salvamento
+                    cliente_salvo = resultado.get('cliente_salvo', False)
+                    negociacao_criada = resultado.get('negociacao_criada', False)
+                    
+                    if cliente_salvo:
+                        cliente_id = resultado.get('cliente_id')
+                        logger.info(f"✅ Cliente salvo no Supabase: {cliente_id}")
+                        
+                        if negociacao_criada:
+                            negociacao_id = resultado.get('negociacao_id')
+                            logger.info(f"✅ Negociação criada no Supabase: {negociacao_id}")
+                        else:
+                            logger.warning("⚠️ Cliente salvo mas negociação não foi criada")
+                    else:
+                        logger.error("❌ Falha ao salvar cliente no Supabase")
+                        erros = resultado.get('erros', [])
+                        for erro in erros:
+                            logger.error(f"❌ Erro {erro['tipo']}: {erro['erro']}")
+                    
                     # Limpar sessão de coleta
                     self.coleta_dados_service.limpar_sessao(remetente)
                     
-                    # AQUI VOCÊ PODE ADICIONAR LÓGICA PARA:
-                    # - Salvar dados no Supabase
-                    # - Transferir para corretor
-                    # - Enviar para sistema de CRM
-                    # - Etc.
-                    
-                    logger.info("🎯 Dados prontos para transferência/salvamento")
+                    logger.info("🎯 Processamento de coleta finalizado")
                 
                 return {
                     "sucesso": True,
