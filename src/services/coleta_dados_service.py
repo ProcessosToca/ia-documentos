@@ -1002,7 +1002,7 @@ Ocorreu um problema ao salvar seus dados. Vou transferir você para um atendente
     
     def _buscar_endereco_viacep(self, cep: str) -> Dict:
         """
-        Busca endereço via API ViaCEP
+        Busca endereço via API ViaCEP com fallback para BrasilAPI
         
         Args:
             cep (str): CEP com 8 dígitos
@@ -1011,6 +1011,8 @@ Ocorreu um problema ao salvar seus dados. Vou transferir você para um atendente
             Dict: Resultado da busca
         """
         try:
+            # TENTATIVA 1: ViaCEP (API principal)
+            logger.info(f"🔍 Buscando CEP {cep} via ViaCEP...")
             url = f"https://viacep.com.br/ws/{cep}/json/"
             response = requests.get(url, timeout=10)
             
@@ -1018,31 +1020,100 @@ Ocorreu um problema ao salvar seus dados. Vou transferir você para um atendente
                 data = response.json()
                 
                 if 'erro' not in data:
+                    logger.info(f"✅ CEP encontrado via ViaCEP: {data.get('logradouro', 'N/A')}")
                     return {
                         'sucesso': True,
-                        'endereco': data
+                        'endereco': data,
+                        'fonte': 'ViaCEP'
                     }
                 else:
+                    logger.warning(f"⚠️ CEP não encontrado no ViaCEP, tentando BrasilAPI...")
+                    return self._buscar_endereco_brasilapi(cep)
+            else:
+                logger.warning(f"⚠️ ViaCEP retornou status {response.status_code}, tentando BrasilAPI...")
+                return self._buscar_endereco_brasilapi(cep)
+                
+        except requests.exceptions.Timeout:
+            logger.warning(f"⚠️ Timeout no ViaCEP, tentando BrasilAPI...")
+            return self._buscar_endereco_brasilapi(cep)
+        except Exception as e:
+            logger.warning(f"⚠️ Erro no ViaCEP ({e}), tentando BrasilAPI...")
+            return self._buscar_endereco_brasilapi(cep)
+
+    def _buscar_endereco_brasilapi(self, cep: str) -> Dict:
+        """
+        Busca endereço via API BrasilAPI (fallback)
+
+        Args:
+            cep (str): CEP com 8 dígitos
+
+        Returns:
+            Dict: Resultado da busca
+        """
+        try:
+            logger.info(f"🔍 Buscando CEP {cep} via BrasilAPI (fallback)...")
+            url = f"https://brasilapi.com.br/api/cep/v1/{cep}"
+            response = requests.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if "cep" in data and "street" in data:
+                    # Normalizar campos para compatibilidade com ViaCEP
+                    endereco_normalizado = {
+                        'cep': data.get('cep', '').replace('-', ''),
+                        'logradouro': data.get('street', ''),
+                        'bairro': data.get('neighborhood', ''),
+                        'localidade': data.get('city', ''),
+                        'uf': data.get('state', ''),
+                        'complemento': '',
+                        'ddd': '',
+                        'gia': '',
+                        'ibge': '',
+                        'siafi': ''
+                    }
+                    
+                    logger.info(f"✅ CEP encontrado via BrasilAPI: {endereco_normalizado.get('logradouro', 'N/A')}")
+                    return {
+                        'sucesso': True,
+                        'endereco': endereco_normalizado,
+                        'fonte': 'BrasilAPI'
+                    }
+                else:
+                    logger.error(f"❌ CEP não encontrado na base BrasilAPI")
                     return {
                         'sucesso': False,
-                        'erro': 'CEP não encontrado na base ViaCEP'
+                        'erro': 'CEP não encontrado em nenhuma base de dados (ViaCEP + BrasilAPI)',
+                        'fonte': 'BrasilAPI'
                     }
-            else:
+            elif response.status_code == 404:
+                logger.error(f"❌ CEP não encontrado na base BrasilAPI (404)")
                 return {
                     'sucesso': False,
-                    'erro': f'Erro na API ViaCEP: {response.status_code}'
+                    'erro': 'CEP não encontrado em nenhuma base de dados (ViaCEP + BrasilAPI)',
+                    'fonte': 'BrasilAPI'
+                }
+            else:
+                logger.error(f"❌ Erro na API BrasilAPI: {response.status_code}")
+                return {
+                    'sucesso': False,
+                    'erro': f'Erro em ambas as APIs - BrasilAPI: {response.status_code}',
+                    'fonte': 'BrasilAPI'
                 }
                 
         except requests.exceptions.Timeout:
+            logger.error(f"❌ Timeout na consulta BrasilAPI")
             return {
                 'sucesso': False,
-                'erro': 'Timeout na consulta ViaCEP'
+                'erro': 'Timeout em ambas as APIs de CEP (ViaCEP + BrasilAPI)',
+                'fonte': 'BrasilAPI'
             }
         except Exception as e:
-            logger.error(f"❌ Erro na busca ViaCEP: {e}")
+            logger.error(f"❌ Erro na busca BrasilAPI: {e}")
             return {
                 'sucesso': False,
-                'erro': f'Erro interno: {str(e)}'
+                'erro': f'Erro interno em ambas as APIs de CEP',
+                'fonte': 'BrasilAPI'
             }
     
     def _normalizar_cpf(self, cpf: str) -> str:

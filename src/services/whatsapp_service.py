@@ -67,6 +67,10 @@ class WhatsAppService:
         # Este serviço gerencia menus interativos enviados aos usuários
         self.menu_service = MenuServiceWhatsApp()
         
+        # NOVO: Serviço de deduplicação de mensagens
+        from .message_deduplication_service import MessageDeduplicationService
+        self.dedup_service = MessageDeduplicationService()
+        
         # NOVO: ConversationLogger para captura de conversas (OPCIONAL)
         # =============================================================
         try:
@@ -419,9 +423,36 @@ class WhatsAppService:
     def enviar_mensagem(self, numero_telefone: str, mensagem: str) -> Dict[str, Any]:
         """
         Envia mensagem via WhatsApp API e captura para logging
+        
+        Se a mensagem for duplicada, apenas retorna sucesso sem enviar,
+        permitindo que o fluxo continue para a próxima mensagem.
         """
         try:
-            # Enviar mensagem
+            # Verificar duplicação com contexto da conversa
+            context = None
+            if self.logging_enabled and self.conversation_logger:
+                conv_id = self.conversation_logger.get_active_conversation_id(numero_telefone)
+                if conv_id and conv_id in self.conversation_logger.active_conversations:
+                    conv_data = self.conversation_logger.active_conversations[conv_id]
+                    context = {
+                        "phase": conv_data.get("conversation_info", {}).get("current_phase", "unknown"),
+                        "conversation_id": conv_id
+                    }
+            
+            # Verificar duplicação
+            is_duplicate = hasattr(self, 'dedup_service') and self.dedup_service.is_duplicate(mensagem, numero_telefone, context)
+            
+            if is_duplicate:
+                # Se for duplicada, apenas loga e retorna sucesso para continuar o fluxo
+                logger.info(f"🔄 Mensagem duplicada ignorada para: {numero_telefone} - Continuando fluxo")
+                return {
+                    "sucesso": True,
+                    "duplicada": True,
+                    "mensagem": mensagem,
+                    "continuar_fluxo": True
+                }
+            
+            # Se não for duplicada, envia normalmente
             resultado = self.whatsapp_api.enviar_mensagem(numero_telefone, mensagem)
             
             # NOVO: Capturar mensagem se for resposta para cliente
@@ -441,7 +472,7 @@ class WhatsAppService:
                         )
             
             return resultado
-            
+                
         except Exception as e:
             logger.error(f"❌ Erro ao enviar mensagem: {str(e)}")
             return {"sucesso": False, "erro": str(e)}
@@ -915,6 +946,19 @@ Não foi possível prosseguir com a coleta automática. Entre em contato diretam
         try:
             logger.info(f"📋 Processando coleta expandida - Cliente: {remetente}")
             
+            # 🔥 DEBUG: Verificar se existe sessão de coleta
+            dados_sessao_atual = self.coleta_dados_service.obter_dados_sessao(remetente)
+            if dados_sessao_atual:
+                logger.info(f"🔍 SESSÃO ENCONTRADA - Etapa atual: {dados_sessao_atual.etapa_atual}")
+                logger.info(f"📊 Dados da sessão: Nome={dados_sessao_atual.nome}, CPF={dados_sessao_atual.cpf}")
+            else:
+                logger.warning(f"⚠️ NENHUMA SESSÃO DE COLETA ENCONTRADA para {remetente}")
+                return {
+                    "sucesso": False,
+                    "erro": "Sessão de coleta não encontrada",
+                    "mensagem_resposta": "Sessão expirada. Por favor, informe seu CPF novamente."
+                }
+            
             # NOVO: Capturar mensagem do cliente
             if self.logging_enabled and self.conversation_logger:
                 # ✅ MELHORADO: Buscar conversa existente (incluindo telefones relacionados)
@@ -951,8 +995,16 @@ Não foi possível prosseguir com a coleta automática. Entre em contato diretam
             if message_id:
                 self.marcar_como_lida(remetente, message_id)
             
+            # 🔥 DEBUG: Log antes do processamento
+            logger.info(f"🔄 Processando mensagem '{mensagem}' para etapa '{dados_sessao_atual.etapa_atual}'")
+            
             # Processar resposta usando o serviço de coleta
             resultado = self.coleta_dados_service.processar_resposta(remetente, mensagem)
+            
+            # 🔥 DEBUG: Log do resultado
+            logger.info(f"📊 Resultado do processamento: sucesso={resultado['sucesso']}, proxima_etapa={resultado.get('proxima_etapa', 'N/A')}")
+            if not resultado['sucesso']:
+                logger.warning(f"⚠️ Erro no processamento: {resultado.get('erro', 'N/A')}")
             
             if resultado['sucesso']:
                 logger.info(f"✅ Etapa processada: {resultado.get('proxima_etapa', 'N/A')}")
@@ -995,6 +1047,11 @@ Não foi possível prosseguir com a coleta automática. Entre em contato diretam
                                 dados_cliente_atualizados["cidade"] = dados_sessao.cidade
                                 dados_cliente_atualizados["uf"] = dados_sessao.uf
                                 logger.info(f"🏠 Endereço incluído: {dados_sessao.cidade}/{dados_sessao.uf}")
+                            
+                            # Incluir número da residência se disponível
+                            if dados_sessao.numero:
+                                dados_cliente_atualizados["numero_residencia"] = dados_sessao.numero
+                                logger.info(f"🏠 Número incluído: {dados_sessao.numero}")
                             
                             # ✅ ATUALIZAÇÃO PROGRESSIVA: Usar mesmo padrão do corretor
                             logger.info(f"🔄 INICIANDO ATUALIZAÇÃO PROGRESSIVA: {conv_id}")
@@ -1122,6 +1179,23 @@ Não foi possível prosseguir com a coleta automática. Entre em contato diretam
                     # Sessão perdida - limpar e reiniciar
                     logger.info(f"🔄 Reiniciando coleta para: {remetente}")
                     self.coleta_dados_service.limpar_sessao(remetente)
+                
+                # 🔥 NOVO: Verificar se precisa reenviar menu de confirmação de endereço
+                elif resultado.get('acao') == 'enviar_menu_confirmacao_endereco':
+                    logger.info(f"🔄 Reenviando menu de confirmação de endereço para: {remetente}")
+                    # Aguardar 1 segundo
+                    time.sleep(1)
+                    # Enviar menu de confirmação
+                    self.menu_service.enviar_menu_confirmacao_endereco(
+                        remetente,
+                        resultado.get('endereco', '')
+                    )
+                    return {
+                        "sucesso": False,
+                        "erro": resultado.get('erro', 'Erro no processamento'),
+                        "acao": "menu_reenviado",
+                        "mensagem_resposta": "Menu de confirmação reenviado"
+                    }
                 
                 # Enviar mensagem de erro se disponível
                 if 'mensagem' in resultado:

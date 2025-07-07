@@ -54,7 +54,7 @@ class OpenAIService:
             
             # Fazer chamada para OpenAI com nova sintaxe
             response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="GPT-4o",
                 messages=[
                     {
                         "role": "system", 
@@ -338,7 +338,7 @@ Responda APENAS em JSON válido:
 
             # Chamada para GPT com configurações otimizadas
             response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="GPT-4o",
                 messages=[
                     {
                         "role": "system",
@@ -506,7 +506,7 @@ Responda APENAS em JSON:
 
             # Chamada para GPT com configurações de validação
             response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="GPT-4o",
                 messages=[
                     {
                         "role": "system",
@@ -653,7 +653,7 @@ SEMPRE retorne JSON válido sem texto adicional."""
 
             # Fazer chamada para GPT-4
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="GPT-4o",
                 messages=[
                     {"role": "system", "content": prompt_sistema},
                     {"role": "user", "content": prompt_usuario}
@@ -791,6 +791,24 @@ Analise esta conversa de WhatsApp e identifique:
 4. **FORMATAÇÃO DE MENUS**: Mensagens com "(row_id: ...)" devem ser naturalizadas
 5. **MENSAGENS PERDIDAS**: Detectar se faltam respostas do cliente baseado no fluxo
 
+**REGRAS ESPECÍFICAS OBRIGATÓRIAS:**
+
+1. **CPF SEMPRE = CLIENTE**: Qualquer mensagem contendo CPF (11 dígitos) deve ter sender="cliente"
+
+2. **REMOVER MENSAGEM DUPLICADA DE CPF**: 
+   - SEMPRE remover: "📄 Para prosseguir, preciso do seu CPF: (Somente números, exemplo: 12345678901)"
+   - MANTER apenas: "✅ Perfeito! Para prosseguir, preciso do seu CPF."
+
+3. **MENSAGENS IA→CORRETOR (sender="ia", receiver="corretor")**:
+   - "✅ Iniciando contato com o cliente..."
+   - "✅ Dados do cliente coletados com sucesso!"
+   - Qualquer mensagem começando com "✅ Dados do cliente"
+
+4. **CLASSIFICAÇÃO CORRETA**:
+   - Mensagem com CPF = sender="cliente"
+   - Mensagem "✅ Iniciando contato" = sender="ia", receiver="corretor"
+   - Mensagem "✅ Dados coletados" = sender="ia", receiver="corretor"
+
 **MENSAGENS DA CONVERSA:**
 {json.dumps(mensagens_para_analise, ensure_ascii=False, indent=2)}
 
@@ -828,6 +846,14 @@ OUTROS PADRÕES:
       "novo_conteudo": "nova versão sem detalhes técnicos"
     }}
   ],
+  "mensagens_para_reclassificar": [
+    {{
+      "index": índice,
+      "novo_sender": "cliente|ia|corretor",
+      "novo_receiver": "ia|corretor|cliente",
+      "motivo": "classificação correta aplicada"
+    }}
+  ],
   "mensagens_para_inserir": [
     {{
       "inserir_apos_index": índice,
@@ -844,13 +870,14 @@ OUTROS PADRÕES:
 - Remover apenas duplicatas óbvias e logs técnicos
 - Naturalizar menus: "Iniciar Fechamento Locação" (sem row_id)
 - INSERIR mensagens perdidas do cliente automaticamente
+- RECLASSIFICAR mensagens conforme regras específicas
 - Preservar fluxo da conversa
 - Ser conservador - na dúvida, manter
 """
 
             # Chamar OpenAI
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model="GPT-4o",
                 messages=[
                     {
                         "role": "system", 
@@ -949,6 +976,15 @@ Seja PRECISO na detecção de fluxos quebrados."""
             reformatacoes = {item['index']: item['novo_conteudo'] 
                            for item in analise.get('mensagens_para_reformatar', [])}
             
+            # NOVO: Processar reclassificações
+            reclassificacoes = {}
+            for item in analise.get('mensagens_para_reclassificar', []):
+                reclassificacoes[item['index']] = {
+                    'sender': item.get('novo_sender'),
+                    'receiver': item.get('novo_receiver'),
+                    'motivo': item.get('motivo')
+                }
+            
             # Processar mensagens para inserir
             mensagens_para_inserir = {}
             for item in analise.get('mensagens_para_inserir', []):
@@ -961,16 +997,34 @@ Seja PRECISO na detecção de fluxos quebrados."""
                     logger.info(f"🗑️ Removendo mensagem {i}: {mensagem.get('content', '')[:50]}...")
                     continue
                 
+                # Criar cópia da mensagem para modificações
+                mensagem_processada = mensagem.copy()
+                
                 # Aplicar reformatação se necessário
                 if i in reformatacoes:
-                    mensagem_reformatada = mensagem.copy()
-                    mensagem_reformatada['content'] = reformatacoes[i]
-                    mensagem_reformatada['ai_reformatted'] = True
-                    mensagens_limpas.append(mensagem_reformatada)
+                    mensagem_processada['content'] = reformatacoes[i]
+                    mensagem_processada['ai_reformatted'] = True
                     logger.info(f"✏️ Reformatada mensagem {i}: {reformatacoes[i][:50]}...")
-                else:
-                    # Manter mensagem original
-                    mensagens_limpas.append(mensagem)
+                
+                # NOVO: Aplicar reclassificação se necessário
+                if i in reclassificacoes:
+                    reclass = reclassificacoes[i]
+                    if reclass['sender']:
+                        mensagem_processada['sender'] = reclass['sender']
+                        mensagem_processada['sender_specific'] = reclass['sender']
+                    if reclass['receiver']:
+                        mensagem_processada['receiver'] = reclass['receiver']
+                        mensagem_processada['receiver_specific'] = reclass['receiver']
+                        # Atualizar metadata se existir
+                        if 'metadata' in mensagem_processada:
+                            mensagem_processada['metadata']['receiver_explicit'] = reclass['receiver']
+                    
+                    mensagem_processada['ai_reclassified'] = True
+                    mensagem_processada['ai_reclassified_reason'] = reclass['motivo']
+                    
+                    logger.info(f"🔄 Reclassificada mensagem {i}: {reclass['sender']}→{reclass['receiver']} - {reclass['motivo']}")
+                
+                mensagens_limpas.append(mensagem_processada)
                 
                 # Verificar se precisa inserir mensagem após esta
                 if i in mensagens_para_inserir:
@@ -988,7 +1042,7 @@ Seja PRECISO na detecção de fluxos quebrados."""
                             "enhanced_method": True,
                             "ai_inserted": True
                         },
-                        "sender_specific": "cliente",
+                        "sender_specific": nova_mensagem.get('sender', 'cliente'),
                         "receiver_specific": "ia",
                         "interaction_type": "cliente_ia",
                         "phase": mensagem.get('phase', 'ia_cliente'),

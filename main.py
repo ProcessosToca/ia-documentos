@@ -110,13 +110,23 @@ async def webhook_whatsapp(request: Request):
                 logger.info(f"📋 RESPOSTA DE MENU de {nome_remetente}: {opcao_selecionada}")
                 logger.info(f"🎯 Row ID capturado: {row_id}")
                 
-                # Processar resposta do menu usando a nova função
-                logger.info(f"🔄 Processando resposta de menu: {row_id} do usuário {remetente}")
-                resultado_menu = whatsapp_service.processar_resposta_menu_colaborador(
-                    remetente=remetente,
-                    row_id=row_id,
-                    webhook_data=webhook_data
-                )
+                # CORREÇÃO: Verificar se é resposta de menu de CLIENTE (confirmação de endereço)
+                if row_id in ["confirmar_endereco_sim", "confirmar_endereco_nao"]:
+                    # É resposta de confirmação de endereço do CLIENTE
+                    logger.info(f"🏠 Processando confirmação de endereço do CLIENTE: {row_id}")
+                    resultado_menu = whatsapp_service.processar_coleta_expandida_cliente(
+                        remetente=remetente,
+                        mensagem=row_id,
+                        message_id=message_id
+                    )
+                else:
+                    # É resposta de menu de COLABORADOR
+                    logger.info(f"🔄 Processando resposta de menu do COLABORADOR: {row_id}")
+                    resultado_menu = whatsapp_service.processar_resposta_menu_colaborador(
+                        remetente=remetente,
+                        row_id=row_id,
+                        webhook_data=webhook_data
+                    )
                 logger.info(f"✅ Resultado do processamento: {resultado_menu}")
                 
                 return JSONResponse(

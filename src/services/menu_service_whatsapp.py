@@ -130,12 +130,12 @@ class MenuServiceWhatsApp:
                 # MENU DE CONFIRMAÇÃO DE ENDEREÇO
                 "confirmar_endereco_sim": {
                     "acao": "confirmar_endereco",
-                    "mensagem": "",
+                    "mensagem": "✅ Endereço confirmado! Agora preciso do número da residência:",
                     "proximo_passo": "aguardando_numero"
                 },
                 "confirmar_endereco_nao": {
                     "acao": "corrigir_endereco",
-                    "mensagem": "",
+                    "mensagem": "❌ Vamos corrigir o endereço. Por favor, digite o CEP novamente:",
                     "proximo_passo": "aguardando_cep"
                 },
                 
