@@ -327,20 +327,9 @@ Formato: DD/MM/AAAA""",
             }
     
     def _processar_cep(self, dados: DadosCliente, cep_str: str) -> Dict:
-        """
-        Processa e valida CEP informado pelo cliente
+        """Processa CEP e busca endereço via ViaCEP"""
+        cep_limpo = re.sub(r'\D', '', cep_str)
         
-        Args:
-            dados (DadosCliente): Dados da sessão
-            cep_str (str): CEP informado
-            
-        Returns:
-            Dict: Resultado do processamento
-        """
-        # Normalizar CEP (remover pontos e traços)
-        cep_limpo = re.sub(r'[^\d]', '', cep_str)
-        
-        # Validar formato
         if not self.regex_cep.match(cep_limpo):
             return {
                 'sucesso': False,
@@ -349,153 +338,104 @@ Formato: DD/MM/AAAA""",
 
 Por favor, digite um CEP válido com 8 números:
 
-Exemplo: 12345-678 ou 12345678""",
-                'acao': 'solicitar_cep'
+Exemplo: 18035310 ou 18035-310
+
+🏠 *Digite seu CEP:*""",
+                'acao': 'solicitar_novamente'
             }
-            
-        # Buscar endereço via API
-        endereco = self._buscar_endereco_viacep(cep_limpo)
         
-        if not endereco.get('sucesso'):
+        # Buscar endereço via ViaCEP
+        endereco_info = self._buscar_endereco_viacep(cep_limpo)
+        
+        if not endereco_info['sucesso']:
             return {
                 'sucesso': False,
                 'erro': 'CEP não encontrado',
-                'mensagem': """❌ *CEP não encontrado*
+                'mensagem': f"""❌ *CEP não encontrado*
 
-Por favor, verifique o CEP e tente novamente.
+O CEP {cep_limpo} não foi encontrado na base de dados.
 
-Se o problema persistir, você pode:
-1. Confirmar o CEP no site dos Correios
-2. Tentar outro CEP próximo
-3. Entrar em contato com nosso suporte""",
-                'acao': 'solicitar_cep'
+Por favor, verifique o CEP e digite novamente:
+
+🏠 *Digite seu CEP:*""",
+                'acao': 'solicitar_novamente'
             }
-            
-        # Atualizar dados da sessão
-        endereco_info = endereco.get('endereco', {})
+        
+        # CEP encontrado - atualizar dados
+        endereco = endereco_info['endereco']
         dados.cep = cep_limpo
-        dados.rua = endereco_info.get('logradouro', '')
-        dados.bairro = endereco_info.get('bairro', '')
-        dados.cidade = endereco_info.get('localidade', '')
-        dados.uf = endereco_info.get('uf', '')
-        
-        # Montar endereço completo para confirmação
-        dados.endereco_completo = f"{dados.rua}\n{dados.bairro}\n{dados.cidade}/{dados.uf}\nCEP: {cep_limpo}"
-        
-        # Atualizar etapa
+        dados.rua = endereco['logradouro']
+        dados.bairro = endereco['bairro']
+        dados.cidade = endereco['localidade']
+        dados.uf = endereco['uf']
+        dados.endereco_completo = f"{endereco['logradouro']}, {endereco['bairro']}, {endereco['localidade']}/{endereco['uf']}"
         dados.etapa_atual = "endereco_confirmacao"
         
-        # Retornar sucesso com ação para enviar menu de confirmação
         return {
             'sucesso': True,
             'dados_atualizados': True,
             'proxima_etapa': 'endereco_confirmacao',
             'mensagem': f"""✅ *Endereço encontrado:*
 
-📍 {dados.endereco_completo}
+📍 *{dados.endereco_completo}*
+🔢 *CEP:* {cep_limpo}
 
-O endereço está correto?""",
-            'acao': 'enviar_menu_confirmacao_endereco',
-            'endereco': dados.endereco_completo
+Este endereço está correto?
+
+Digite:
+✅ *SIM* - para confirmar
+❌ *NÃO* - para informar o endereço correto"""
         }
-
+    
     def _processar_confirmacao_endereco(self, dados: DadosCliente, resposta: str) -> Dict:
-        """
-        Processa confirmação do endereço via menu interativo
-        
-        Args:
-            dados (DadosCliente): Dados da sessão
-            resposta (str): Resposta do menu (confirmar_endereco_sim ou confirmar_endereco_nao)
-            
-        Returns:
-            Dict: Resultado do processamento
-        """
-        # Processar resposta do menu
-        if resposta == "confirmar_endereco_sim":
-            # Endereço confirmado - prosseguir para número
-            dados.etapa_atual = "numero"
-            
-            return {
-                'sucesso': True,
-                'dados_atualizados': True,
-                'proxima_etapa': 'numero',
-                'mensagem': """✅ *Endereço confirmado!*
-
-🔢 *Agora digite o número da sua residência:*
-
-Exemplo: 123, 45A, S/N"""
-            }
-            
-        elif resposta == "confirmar_endereco_nao":
-            # Endereço incorreto - voltar para CEP
-            dados.etapa_atual = "cep"
-            dados.cep = ""
-            dados.endereco_completo = ""
-            dados.rua = ""
-            dados.bairro = ""
-            dados.cidade = ""
-            dados.uf = ""
-            
-            return {
-                'sucesso': True,
-                'dados_atualizados': True,
-                'proxima_etapa': 'cep',
-                'mensagem': """❌ *Endereço não confirmado*
-
-Por favor, digite o CEP novamente:
-
-Exemplo: 12345-678 ou 12345678"""
-            }
-            
-        # Fallback para respostas de texto (caso o menu falhe)
+        """Processa confirmação do endereço"""
         resposta_lower = resposta.lower().strip()
         
         if resposta_lower in ['sim', 's', 'yes', 'correto', 'certo', '✅']:
-            # Endereço confirmado via texto
+            # Endereço confirmado
             dados.etapa_atual = "numero"
             
             return {
                 'sucesso': True,
                 'dados_atualizados': True,
                 'proxima_etapa': 'numero',
-                'mensagem': """✅ *Endereço confirmado!*
+                'mensagem': f"""✅ *Endereço confirmado!*
+
+🏠 *{dados.endereco_completo}*
 
 🔢 *Agora digite o número da sua residência:*
 
 Exemplo: 123, 45A, S/N"""
             }
-            
+        
         elif resposta_lower in ['não', 'nao', 'no', 'incorreto', 'errado', '❌']:
-            # Endereço incorreto via texto
-            dados.etapa_atual = "cep"
-            dados.cep = ""
-            dados.endereco_completo = ""
-            dados.rua = ""
-            dados.bairro = ""
-            dados.cidade = ""
-            dados.uf = ""
-            
+            # Endereço incorreto - solicitar manual
             return {
-                'sucesso': True,
-                'dados_atualizados': True,
-                'proxima_etapa': 'cep',
-                'mensagem': """❌ *Endereço não confirmado*
+                'sucesso': False,
+                'erro': 'Endereço incorreto - coleta manual necessária',
+                'mensagem': """📝 *Endereço Manual*
 
-Por favor, digite o CEP novamente:
+Como o endereço encontrado não confere, vou te transferir para um de nossos atendentes que coletará suas informações corretamente.
 
-Exemplo: 12345-678 ou 12345678"""
+⏰ *Aguarde um momento...*
+
+📞 Caso prefira, entre em contato: *(14) 99999-9999*""",
+                'acao': 'transferir_atendente'
             }
-            
+        
         else:
-            # Resposta não reconhecida - reenviar menu
+            # Resposta não reconhecida
             return {
                 'sucesso': False,
                 'erro': 'Resposta não reconhecida',
-                'mensagem': """❓ *Por favor, use o menu para confirmar o endereço*
+                'mensagem': f"""📍 *Endereço encontrado:*
+*{dados.endereco_completo}*
 
-O endereço está correto?""",
-                'acao': 'enviar_menu_confirmacao_endereco',
-                'endereco': dados.endereco_completo
+Esse é seu endereço?
+
+✅ *SIM* - se o endereço está correto
+❌ *NÃO* - se o endereço está incorreto""",
+                'acao': 'solicitar_novamente'
             }
     
     def _processar_numero(self, dados: DadosCliente, numero: str) -> Dict:

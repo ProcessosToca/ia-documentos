@@ -115,8 +115,6 @@ class WhatsAppService:
         logger.info(f"WhatsApp Service inicializado com arquitetura modular")
         logger.info("🔧 Módulos ativos: WhatsAppAPI + SessionManager + MenuService")
         logger.info("✅ Compatibilidade mantida - todas as funcionalidades preservadas")
-        
-        self.company_name = os.getenv('COMPANY_NAME', 'Locação Online')
 
     # PROPRIEDADES DE COMPATIBILIDADE
     # ================================
@@ -1026,43 +1024,6 @@ Não foi possível prosseguir com a coleta automática. Entre em contato diretam
                                 content=resultado['mensagem'],
                                 phase="ia_cliente"
                             )
-                
-                # ✅ NOVO: Verificar se precisa enviar menu de confirmação de endereço
-                if resultado.get('proxima_etapa') == 'endereco_confirmacao' and resultado.get('acao') == 'enviar_menu_confirmacao_endereco':
-                    # Enviar mensagem primeiro
-                    if 'mensagem' in resultado:
-                        self.enviar_mensagem(remetente, resultado['mensagem'])
-                        
-                        # NOVO: Capturar mensagem de resposta da IA
-                        if self.logging_enabled and self.conversation_logger:
-                            conv_id = self.conversation_logger.obter_conversa_ativa_por_telefone(remetente)
-                            if conv_id:
-                                self.conversation_logger.add_message_enhanced(
-                                    conversation_id=conv_id,
-                                    sender="ia",
-                                    receiver="cliente",
-                                    content=resultado['mensagem'],
-                                    phase="ia_cliente"
-                                )
-                    
-                    # Aguardar 1 segundo
-                    time.sleep(1)
-                    
-                    # Enviar menu de confirmação
-                    self.menu_service.enviar_menu_confirmacao_endereco(
-                        remetente,
-                        resultado.get('endereco', '')
-                    )
-                    return {
-                        "sucesso": True,
-                        "etapa": resultado.get('proxima_etapa', 'processando'),
-                        "mensagem_resposta": resultado.get('mensagem', 'Processado com sucesso'),
-                        "dados_completos": resultado.get('coleta_finalizada', False)
-                    }
-                
-                # Enviar mensagem de resposta (para outros casos)
-                if 'mensagem' in resultado:
-                    self.enviar_mensagem(remetente, resultado['mensagem'])
                 
                 # Verificar se coleta foi finalizada
                 if resultado.get('coleta_finalizada'):
@@ -2095,25 +2056,15 @@ Peço desculpas pelo inconveniente! 🙏"""
         """
         try:
             # Obter dados do corretor se disponível
-            corretor_nome = "Corretor"  # Padrão se não encontrar
+            corretor_nome = "Corretor da Toca Imóveis"  # Padrão se não encontrar
             
-            # Tentar obter nome do corretor do conversation_logger
+            # Tentar obter nome do corretor do banco de dados
             try:
-                if self.logging_enabled and self.conversation_logger:
-                    conv_id = self.conversation_logger.get_active_conversation_id(corretor)
-                    if conv_id:
-                        # Tentar obter dados do broker da conversa atual
-                        participants = self.conversation_logger.get_participants(conv_id)
-                        if participants and 'broker' in participants:
-                            broker_name = participants['broker'].get('name')
-                            if broker_name and isinstance(broker_name, str) and len(broker_name.strip()) > 0:
-                                corretor_nome = broker_name.strip()
-                                logger.info(f"✅ Nome do corretor obtido do logger: {corretor_nome}")
-                
-                logger.info(f"📋 Usando nome para corretor: {corretor_nome}")
+                # TODO: Implementar busca específica do nome do corretor
+                # Por enquanto, usar nome padrão mais profissional
+                logger.info(f"📋 Usando nome padrão para corretor: {corretor_nome}")
             except Exception as e:
                 logger.warning(f"⚠️ Não foi possível obter nome do corretor: {e}")
-                # Mantém o nome padrão em caso de erro
             
             # Converter telefone do cliente para formato para verificação
             telefone_cliente = dados_cliente.get('telefone', '')
@@ -2173,7 +2124,7 @@ Peço desculpas pelo inconveniente! 🙏"""
             # Enviar mensagem inicial para o cliente
             mensagem_cliente = f"""🏠 *Olá {dados_cliente['nome']}!*
 
-Sou a Bia, assistente virtual da *{self.company_name}*.
+Sou a Bia, assistente virtual da *Toca Imóveis*.
 
 O corretor *{corretor_nome}* solicitou iniciar o processo de *fechamento de locação* com você.
 
@@ -2404,7 +2355,7 @@ Deseja prosseguir com o atendimento?"""
             logger.error(f"❌ Erro ao enviar política de privacidade: {e}")
             
             # Fallback: enviar link padrão
-            mensagem_fallback = f"""📄 **Política de Privacidade - {self.company_name}**
+            mensagem_fallback = """📄 **Política de Privacidade - Toca Imóveis**
 
 🔗 **Link para acesso**: https://tocaimoveis.com.br/politica-privacidade
 
@@ -2464,64 +2415,3 @@ Para exercer seus direitos ou em caso de dúvidas sobre esta Política, entre em
 Esta Política pode ser atualizada a qualquer momento para garantir nossa conformidade com a LGPD.
 
 ⬅️ *Volte para continuar seu atendimento após a leitura.*"""
-
-    def _processar_coleta_dados(self, mensagem: str, numero_telefone: str, dados_sessao: Dict) -> Dict:
-        """
-        Processa mensagens durante a coleta de dados
-        """
-        try:
-            # Processar resposta atual
-            resultado = self.coleta_dados_service.processar_resposta(
-                numero_telefone,
-                mensagem
-            )
-            
-            if not resultado['sucesso']:
-                return {
-                    'sucesso': False,
-                    'mensagem': resultado.get('mensagem', 'Erro ao processar dados'),
-                    'erro': resultado.get('erro', 'Erro desconhecido')
-                }
-            
-            # Verificar ação necessária
-            acao = resultado.get('acao')
-            
-            # Enviar mensagem de resposta primeiro
-            if resultado.get('mensagem'):
-                self.whatsapp_api.enviar_mensagem(
-                    numero_telefone,
-                    resultado['mensagem']
-                )
-            
-            # Se for ação de menu de confirmação de endereço
-            if acao == 'enviar_menu_confirmacao_endereco':
-                # Aguardar 1 segundo para garantir que a mensagem anterior foi entregue
-                time.sleep(2)
-                
-                # Enviar menu de confirmação
-                menu_result = self.menu_service.enviar_menu_confirmacao_endereco(
-                    numero_telefone,
-                    resultado.get('endereco', '')
-                )
-                
-                if not menu_result['sucesso']:
-                    logger.warning(f"⚠️ Erro ao enviar menu de confirmação: {menu_result.get('erro')}")
-                    # Fallback: continuar com mensagem de texto
-                    self.whatsapp_api.enviar_mensagem(
-                        numero_telefone,
-                        "Por favor, responda *SIM* se o endereço está correto ou *NÃO* para corrigir."
-                    )
-            
-            return {
-                'sucesso': True,
-                'mensagem': resultado.get('mensagem', ''),
-                'acao': acao
-            }
-            
-        except Exception as e:
-            logger.error(f"❌ Erro ao processar coleta de dados: {str(e)}")
-            return {
-                'sucesso': False,
-                'mensagem': 'Erro ao processar sua resposta. Por favor, tente novamente.',
-                'erro': str(e)
-            }

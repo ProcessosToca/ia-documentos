@@ -16,7 +16,6 @@ class OpenAIService:
     def __init__(self):
         # Configurar cliente OpenAI
         self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-        self.company_name = os.getenv('COMPANY_NAME', 'Locação Online')
         
     def interpretar_mensagem(self, mensagem: str) -> Dict[str, Any]:
         """
@@ -607,7 +606,8 @@ SEMPRE retorne JSON válido sem texto adicional."""
                 setor_colaborador = contexto_colaborador.get('setor', 'Não informado')
             
             # Prompt especializado em negociação de locação
-            prompt_sistema = f"""Você é um ESPECIALISTA em NEGOCIAÇÃO DE LOCAÇÃO IMOBILIÁRIA e assistente para colaboradores da {self.company_name}.
+            prompt_sistema = """
+            Você é um ESPECIALISTA em NEGOCIAÇÃO DE LOCAÇÃO IMOBILIÁRIA e assistente para colaboradores da Toca Imóveis.
 
             ESPECIALIDADES:
             🏠 Processos de locação sem fiador
@@ -625,7 +625,7 @@ SEMPRE retorne JSON válido sem texto adicional."""
             - Forneça PASSOS CONCRETOS quando aplicável
             - Mencione DOCUMENTOS ESPECÍFICOS quando necessário
             - Use EMOJIS para organizar a informação
-            - Se não souber algo específico da {self.company_name}, seja transparente
+            - Se não souber algo específico da Toca Imóveis, seja transparente
             - Foque em SOLUÇÕES PRÁTICAS para o dia a dia
 
             FORMATO DA RESPOSTA:
@@ -642,7 +642,7 @@ SEMPRE retorne JSON válido sem texto adicional."""
             DÚVIDA:
             {duvida}
 
-            Responda esta dúvida de forma especializada, considerando que é um colaborador da {self.company_name} que precisa de orientação prática para seu trabalho diário.
+            Responda esta dúvida de forma especializada, considerando que é um colaborador da Toca Imóveis que precisa de orientação prática para seu trabalho diário.
 
             Formate sua resposta em JSON com:
             - "resposta": Resposta detalhada e prática para a dúvida
