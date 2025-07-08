@@ -1,0 +1,436 @@
+{
+    "conversation_info": {
+      "id": "conv_20250707_164701_06766165",
+      "type": "em_andamento",
+      "status": "finalized",
+      "start_time": "2025-07-07T16:47:01.415492",
+      "last_updated": "2025-07-07T17:03:39.302584",
+      "phone_number": "5514997751850",
+      "version": "2.0",
+      "current_phase": "ia_cliente",
+      "business_context": "rental_process",
+      "related_phones": [
+        "5514997751850"
+      ],
+      "end_time": "2025-07-07T17:03:39.302570"
+    },
+    "participants": {
+      "broker": {
+        "type": "broker",
+        "name": "Processos Toca",
+        "phone": "5514997751850",
+        "cpf": "41615520848",
+        "sector": "Processos"
+      },
+      "client": {
+        "name": "Nathalia Silva Costa Garcia",
+        "phone": "5514997751850",
+        "whatsapp_verified": true,
+        "cpf": "07420418837",
+        "email": "vinicius@gmail.com",
+        "data_nascimento": "12/02/1996",
+        "idade": 29,
+        "endereco_completo": "Rua Onesimo Camillo Teixeira\nResidencial Angelo Sposito - Jardim Marina\nMarília/SP\nCEP: 17511888",
+        "cep": "17511888",
+        "cidade": "Marília",
+        "uf": "SP",
+        "numero_residencia": "57"
+      },
+      "ai": {
+        "name": "IA Toca Imóveis",
+        "version": "1.0",
+        "model": "gpt-4o-mini"
+      }
+    },
+    "conversation_summary": {
+      "total_messages": 16,
+      "ai_messages": 11,
+      "user_messages": 5,
+      "duration_seconds": 0,
+      "classification_changes": [
+        {
+          "timestamp": "2025-07-07T16:48:49.445721",
+          "from_type": "em_andamento",
+          "to_type": "em_andamento",
+          "reason": "menu_selection"
+        },
+        {
+          "timestamp": "2025-07-07T16:51:43.337033",
+          "from_phase": "ia_corretor",
+          "to_phase": "ia_cliente",
+          "reason": "explicit_phase_change",
+          "type": "phase_transition"
+        },
+        {
+          "timestamp": "2025-07-07T16:51:43.342504",
+          "from_phase": "ia_cliente",
+          "to_phase": "ia_corretor",
+          "reason": "explicit_phase_change",
+          "type": "phase_transition"
+        },
+        {
+          "timestamp": "2025-07-07T16:52:45.841511",
+          "from_phase": "ia_corretor",
+          "to_phase": "ia_cliente",
+          "reason": "explicit_phase_change",
+          "type": "phase_transition"
+        },
+        {
+          "timestamp": "2025-07-07T16:55:43.947802",
+          "from_phase": "ia_cliente",
+          "to_phase": "ia_corretor",
+          "reason": "explicit_phase_change",
+          "type": "phase_transition"
+        },
+        {
+          "timestamp": "2025-07-07T16:55:46.419161",
+          "from_phase": "ia_corretor",
+          "to_phase": "ia_cliente",
+          "reason": "explicit_phase_change",
+          "type": "phase_transition"
+        }
+      ],
+      "phases_count": 2,
+      "specific_interactions": {
+        "ia_corretor": 5,
+        "ia_cliente": 6,
+        "corretor_ia": 3,
+        "cliente_ia": 2
+      },
+      "cleaned_by_ai": true,
+      "original_count": 37,
+      "removed_count": 21
+    },
+    "messages": [
+      {
+        "id": "msg_001",
+        "timestamp": "2025-07-07T16:47:17.341420",
+        "sender": "ia",
+        "content": "Olá Processos Toca! 👋\n✅ Acesso autorizado como Colaborador da Locação Online\nSetor: Processos",
+        "message_type": "text",
+        "metadata": {
+          "receiver_explicit": "corretor",
+          "enhanced_method": true
+        },
+        "sender_specific": "ia",
+        "receiver_specific": "corretor",
+        "interaction_type": "ia_corretor",
+        "phase": "ia_corretor",
+        "supabase_synced": true,
+        "supabase_sync_timestamp": "2025-07-07T17:03:45.622766"
+      },
+      {
+        "id": "msg_002",
+        "timestamp": "2025-07-07T16:48:49.448769",
+        "sender": "corretor",
+        "content": "Menu selecionado: Iniciar Fechamento Locação",
+        "message_type": "text",
+        "metadata": {
+          "receiver_explicit": "ia",
+          "enhanced_method": true
+        },
+        "sender_specific": "corretor",
+        "receiver_specific": "ia",
+        "interaction_type": "corretor_ia",
+        "phase": "ia_corretor",
+        "ai_reformatted": true,
+        "supabase_synced": true,
+        "supabase_sync_timestamp": "2025-07-07T17:03:45.622777"
+      },
+      {
+        "id": "msg_002a",
+        "timestamp": "2025-07-07T16:49:10.000000",
+        "sender": "ia",
+        "content": "📝 Vamos coletar dados do cliente para iniciar o fechamento.\n\nPor favor, informe o nome completo do cliente:",
+        "message_type": "text",
+        "metadata": {
+          "receiver_explicit": "corretor",
+          "enhanced_method": true
+        },
+        "sender_specific": "ia",
+        "receiver_specific": "corretor",
+        "interaction_type": "ia_corretor",
+        "phase": "ia_corretor",
+        "supabase_synced": true,
+        "supabase_sync_timestamp": "2025-07-07T17:03:45.622780"
+      },
+      {
+        "id": "msg_003",
+        "timestamp": "2025-07-07T16:49:37.033499",
+        "sender": "corretor",
+        "content": "Nathalia Silva Costa Garcia",
+        "message_type": "text",
+        "metadata": {
+          "receiver_explicit": "ia",
+          "enhanced_method": true
+        },
+        "sender_specific": "corretor",
+        "receiver_specific": "ia",
+        "interaction_type": "corretor_ia",
+        "phase": "ia_corretor",
+        "supabase_synced": true,
+        "supabase_sync_timestamp": "2025-07-07T17:03:45.622782"
+      },
+      {
+        "id": "msg_004",
+        "timestamp": "2025-07-07T16:50:13.835507",
+        "sender": "ia",
+        "content": "✅ Nome registrado: *Nathalia Silva Costa Garcia*\n\n📞 Agora informe o telefone do cliente:\n(Exemplo: 11999999999 ou (11) 99999-9999)",
+        "message_type": "text",
+        "metadata": {
+          "receiver_explicit": "corretor",
+          "enhanced_method": true
+        },
+        "sender_specific": "ia",
+        "receiver_specific": "corretor",
+        "interaction_type": "ia_corretor",
+        "phase": "ia_corretor",
+        "supabase_synced": true,
+        "supabase_sync_timestamp": "2025-07-07T17:03:45.622784"
+      },
+      {
+        "id": "msg_005",
+        "timestamp": "2025-07-07T16:51:06.342705",
+        "sender": "corretor",
+        "content": "14997751850",
+        "message_type": "text",
+        "metadata": {
+          "receiver_explicit": "ia",
+          "enhanced_method": true
+        },
+        "sender_specific": "corretor",
+        "receiver_specific": "ia",
+        "interaction_type": "corretor_ia",
+        "phase": "ia_corretor",
+        "supabase_synced": true,
+        "supabase_sync_timestamp": "2025-07-07T17:03:45.622786"
+      },
+      {
+        "id": "msg_006",
+        "timestamp": "2025-07-07T16:51:43.339359",
+        "sender": "ia",
+        "content": "✅ *Dados do cliente coletados com sucesso!*\n\n👤 *Nome:* Nathalia Silva Costa Garcia\n📞 *Telefone:* Telefone formatado: (14) 99775-1850",
+        "message_type": "text",
+        "metadata": {
+          "receiver_explicit": "corretor",
+          "enhanced_method": true
+        },
+        "sender_specific": "ia",
+        "receiver_specific": "corretor",
+        "interaction_type": "ia_corretor",
+        "phase": "ia_corretor",
+        "ai_reclassified": true,
+        "ai_reclassified_reason": "Mensagem 'Dados coletados' sempre deve ser IA→Corretor",
+        "supabase_synced": true,
+        "supabase_sync_timestamp": "2025-07-07T17:03:45.622789"
+      },
+      {
+        "id": "msg_009",
+        "timestamp": "2025-07-07T16:53:22.340296",
+        "sender": "ia",
+        "content": "🏠 *Olá Nathalia Silva Costa Garcia!*\n\nSou a Bia, assistente virtual da *Locação Online*.\n\nO corretor *Processos Toca* solicitou iniciar o processo de *fechamento de locação* com você.\n\nDeseja prosseguir com o atendimento?",
+        "message_type": "text",
+        "metadata": {
+          "receiver_explicit": "cliente",
+          "enhanced_method": true
+        },
+        "sender_specific": "ia",
+        "receiver_specific": "cliente",
+        "interaction_type": "ia_cliente",
+        "phase": "ia_cliente",
+        "supabase_synced": true,
+        "supabase_sync_timestamp": "2025-07-07T17:03:45.622791"
+      },
+      {
+        "id": "msg_010",
+        "timestamp": "2025-07-07T16:54:02.047484",
+        "sender": "ia",
+        "content": "✅ *Contato iniciado com sucesso!*\n\n👤 *Cliente:* Nathalia Silva Costa Garcia\n📞 *WhatsApp:* Telefone formatado: (14) 99775-1850\n\n🚀 *Mensagem enviada ao cliente aguardando resposta...*\n\n📋 *Status:* Aguardando confirmação do cliente",
+        "message_type": "text",
+        "metadata": {
+          "receiver_explicit": "corretor",
+          "enhanced_method": true
+        },
+        "sender_specific": "ia",
+        "receiver_specific": "corretor",
+        "interaction_type": "ia_corretor",
+        "phase": "ia_corretor",
+        "ai_reclassified": true,
+        "ai_reclassified_reason": "Mensagem 'aguardando resposta' sempre deve ser IA→Corretor",
+        "supabase_synced": true,
+        "supabase_sync_timestamp": "2025-07-07T17:03:45.622793"
+      },
+      {
+        "id": "msg_011",
+        "timestamp": "2025-07-07T16:54:31.145088",
+        "sender": "ia",
+        "content": "✅ Perfeito! Para prosseguir, preciso do seu CPF.",
+        "message_type": "text",
+        "metadata": {
+          "receiver_explicit": "cliente",
+          "enhanced_method": true
+        },
+        "sender_specific": "ia",
+        "receiver_specific": "cliente",
+        "interaction_type": "ia_cliente",
+        "phase": "ia_cliente",
+        "supabase_synced": true,
+        "supabase_sync_timestamp": "2025-07-07T17:03:45.622795"
+      },
+      {
+        "id": "msg_014",
+        "timestamp": "2025-07-07T16:55:46.424012",
+        "sender": "cliente",
+        "content": "07420418837",
+        "message_type": "text",
+        "metadata": {
+          "receiver_explicit": "ia",
+          "enhanced_method": true
+        },
+        "sender_specific": "cliente",
+        "receiver_specific": "ia",
+        "interaction_type": "cliente_ia",
+        "phase": "ia_cliente",
+        "supabase_synced": true,
+        "supabase_sync_timestamp": "2025-07-07T17:03:45.622799"
+      },
+      {
+        "id": "msg_015",
+        "timestamp": "2025-07-07T16:56:04.349983",
+        "sender": "ia",
+        "content": "📧 *Digite seu e-mail:*\n\nExemplo: seuemail@gmail.com",
+        "message_type": "text",
+        "metadata": {
+          "receiver_explicit": "cliente",
+          "enhanced_method": true
+        },
+        "sender_specific": "ia",
+        "receiver_specific": "cliente",
+        "interaction_type": "ia_cliente",
+        "phase": "ia_cliente",
+        "supabase_synced": true,
+        "supabase_sync_timestamp": "2025-07-07T17:03:45.622801"
+      },
+      {
+        "id": "msg_016",
+        "timestamp": "2025-07-07T16:56:45.137266",
+        "sender": "cliente",
+        "content": "vinicius@gmail.com",
+        "message_type": "text",
+        "metadata": {
+          "receiver_explicit": "ia",
+          "enhanced_method": true
+        },
+        "sender_specific": "cliente",
+        "receiver_specific": "ia",
+        "interaction_type": "cliente_ia",
+        "phase": "ia_cliente",
+        "supabase_synced": true,
+        "supabase_sync_timestamp": "2025-07-07T17:03:45.622804"
+      },
+      {
+        "id": "msg_018",
+        "timestamp": "2025-07-07T16:57:21.546046",
+        "sender": "ia",
+        "content": "✅ *E-mail confirmado:* vinicius@gmail.com\n\n📅 *Agora digite sua data de nascimento:*\n\nFormato: DD/MM/AAAA\nExemplo: 15/03/1990",
+        "message_type": "text",
+        "metadata": {
+          "receiver_explicit": "cliente",
+          "enhanced_method": true
+        },
+        "sender_specific": "ia",
+        "receiver_specific": "cliente",
+        "interaction_type": "ia_cliente",
+        "phase": "ia_cliente",
+        "supabase_synced": true,
+        "supabase_sync_timestamp": "2025-07-07T17:03:45.622806"
+      },
+      {
+        "id": "msg_020",
+        "timestamp": "2025-07-07T16:57:53.936172",
+        "sender": "cliente",
+        "content": "12/02/1996",
+        "message_type": "text",
+        "metadata": {
+          "receiver_explicit": "ia",
+          "enhanced_method": true
+        },
+        "sender_specific": "cliente",
+        "receiver_specific": "ia",
+        "interaction_type": "cliente_ia",
+        "phase": "ia_cliente",
+        "supabase_synced": true,
+        "supabase_sync_timestamp": "2025-07-07T17:03:45.622808"
+      },
+      {
+        "id": "msg_037",
+        "timestamp": "2025-07-07T17:03:18.876743",
+        "sender": "ia",
+        "content": "✅ Dados coletados com sucesso!\n\n👤 *Cliente:* Nathalia Silva Costa Garcia\n📱 *Telefone:* 5514997751850\n🆔 *CPF:* 074***37\n📧 *E-mail:* vinicius@gmail.com\n📅 *Nascimento:* 12/02/1996 (29 anos)\n\n🏠 *Endereço:*\nRua Onesimo Camillo Teixeira, 57\nResidencial Angelo Sposito - Jardim Marina, Marília/SP\nCEP: 17511-888\n\n⏰ *Aguarde que vou transferir você para o corretor responsável...*",
+        "message_type": "text",
+        "metadata": {
+          "receiver_explicit": "cliente",
+          "enhanced_method": true
+        },
+        "sender_specific": "ia",
+        "receiver_specific": "cliente",
+        "interaction_type": "ia_cliente",
+        "phase": "ia_cliente",
+        "supabase_synced": true,
+        "supabase_sync_timestamp": "2025-07-07T17:03:45.622816"
+      }
+    ],
+    "ai_cleaning": {
+      "cleaned_at": "2025-07-07T17:03:39.302584",
+      "original_message_count": 37,
+      "cleaned_message_count": 16,
+      "justificativa": "CORREÇÃO MANUAL: Mensagens duplicadas removidas corretamente. Mensagens de status IA→Corretor reclassificadas. Mensagem CPF duplicada removida. Fluxo lógico mantido. Pergunta da IA para solicitar nome do cliente inserida.",
+      "removed_indices": [7, 8, 12, 13, 17, 19, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36],
+      "reformatted_count": 1,
+      "reclassified_count": 2,
+      "inserted_count": 1,
+      "reclassified_messages": [
+        {
+          "id": "msg_006",
+          "reason": "Mensagem 'Dados coletados' sempre deve ser IA→Corretor"
+        },
+        {
+          "id": "msg_010", 
+          "reason": "Mensagem 'aguardando resposta' sempre deve ser IA→Corretor"
+        }
+      ]
+    },
+    "conversation_phases": {
+      "current": "ia_cliente",
+      "phases": {
+              "ia_corretor": {
+        "started_at": "2025-07-07T16:47:01.415518",
+        "ended_at": "2025-07-07T16:55:46.419153",
+        "message_count": 7,
+        "classification": "em_andamento"
+      },
+        "ia_cliente": {
+          "started_at": "2025-07-07T16:51:43.337027",
+          "ended_at": "2025-07-07T17:03:39.302590",
+          "message_count": 9,
+          "classification": "em_andamento"
+        }
+      }
+    },
+    "metadata": {
+      "platform": "whatsapp",
+      "system_version": "2.0",
+      "created_by": "conversation_logger_v2",
+      "improvements": [
+        "specific_classification",
+        "phase_separation", 
+        "context_awareness",
+        "manual_correction_applied"
+      ],
+      "supabase_ready": true
+    },
+    "system": {
+      "type": "system",
+      "name": "IA Locação Online"
+    }
+  }

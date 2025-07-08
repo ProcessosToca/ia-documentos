@@ -150,6 +150,22 @@ async def webhook_whatsapp(request: Request):
                 # Interpretar mensagem do usuário com IA
                 resultado = whatsapp_service.interpretar_mensagem_usuario(remetente, texto_mensagem, message_id)
                 
+                # NOVO: Verificar se está em modo buffer (aguardando mais mensagens)
+                if resultado.get("buffering"):
+                    # Mensagem adicionada ao buffer, aguardando mais mensagens
+                    logger.debug(f"⏳ Mensagem em buffer para {nome_remetente}")
+                    return JSONResponse(
+                        status_code=200,
+                        content={
+                            "status": "buffering",
+                            "remetente": remetente,
+                            "nome_remetente": nome_remetente,
+                            "mensagem_original": resultado.get("mensagem_original"),
+                            "aguardando_mais_mensagens": True
+                        }
+                    )
+                
+                # Processamento normal (com ou sem agregação)
                 return JSONResponse(
                     status_code=200,
                     content={
@@ -158,7 +174,8 @@ async def webhook_whatsapp(request: Request):
                         "nome_remetente": nome_remetente,
                         "cpf_encontrado": resultado.get("cpf"),
                         "solicitar_cpf": resultado.get("solicitar_cpf"),
-                        "mensagem_recebida": texto_mensagem[:50] + "..." if len(texto_mensagem) > 50 else texto_mensagem
+                        "mensagem_recebida": texto_mensagem[:50] + "..." if len(texto_mensagem) > 50 else texto_mensagem,
+                        "buffer_usado": resultado.get("buffer_usado", False)
                     }
                 )
         else:
@@ -191,6 +208,86 @@ async def test_send_message(telefone: str, mensagem: str = "Teste do Agente IA")
         
     except Exception as e:
         logger.error(f"❌ Erro no teste de envio: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "sucesso": False,
+                "erro": str(e)
+            }
+        )
+
+@app.get("/buffer/status")
+async def buffer_status():
+    """
+    Endpoint para verificar status do buffer de mensagens
+    """
+    try:
+        if not whatsapp_service.message_buffer:
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "buffer_disponivel": False,
+                    "motivo": "MessageBufferService não inicializado"
+                }
+            )
+        
+        metricas = whatsapp_service.message_buffer.obter_metricas()
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "buffer_disponivel": True,
+                "status": "ativo" if whatsapp_service.message_buffer.enabled else "desabilitado",
+                "metricas": metricas
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao obter status do buffer: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "buffer_disponivel": False,
+                "erro": str(e)
+            }
+        )
+
+@app.post("/buffer/force-process/{telefone}")
+async def force_process_buffer(telefone: str):
+    """
+    Força o processamento de um buffer específico (para testes)
+    """
+    try:
+        if not whatsapp_service.message_buffer:
+            return JSONResponse(
+                status_code=400,
+                content={"erro": "MessageBufferService não disponível"}
+            )
+        
+        mensagem_agregada = whatsapp_service.message_buffer.force_process_buffer(telefone)
+        
+        if mensagem_agregada:
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "sucesso": True,
+                    "telefone": telefone,
+                    "mensagem_agregada": mensagem_agregada,
+                    "acao": "buffer_processado_forcadamente"
+                }
+            )
+        else:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "sucesso": False,
+                    "telefone": telefone,
+                    "motivo": "Nenhum buffer encontrado para este telefone"
+                }
+            )
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao forçar processamento: {str(e)}")
         return JSONResponse(
             status_code=500,
             content={
