@@ -8,6 +8,11 @@ Funcionalidades nesta versão:
 - ✅ Receber mensagens via webhook
 - ✅ Processar solicitações de locação
 - ✅ Integração com W-API do WhatsApp
+- ✅ Diferenciação entre colaboradores e clientes
+- ✅ Menus interativos para colaboradores
+- ✅ Processamento de respostas de menu (listResponseMessage)
+
+NOVO v2.0: Sistema agora processa tanto mensagens de texto quanto respostas de menu
 """
 
 import os
@@ -88,22 +93,91 @@ async def webhook_whatsapp(request: Request):
             message_id = mensagem_processada.get("message_id")
             nome_remetente = mensagem_processada.get("nome_remetente", "")
             
-            logger.info(f"💬 Mensagem de {nome_remetente}: {texto_mensagem}")
+            # NOVA LÓGICA: VERIFICAR SE É RESPOSTA DE MENU
+            # ==============================================
             
-            # Interpretar mensagem do usuário com IA
-            resultado = whatsapp_service.interpretar_mensagem_usuario(remetente, texto_mensagem, message_id)
+            # Extrair dados de resposta de menu se existir
+            msg_content = webhook_data.get('msgContent', {})
+            list_response = msg_content.get('listResponseMessage')
             
-            return JSONResponse(
-                status_code=200,
-                content={
-                    "status": "interpretado",
-                    "remetente": remetente,
-                    "nome_remetente": nome_remetente,
-                    "cpf_encontrado": resultado.get("cpf"),
-                    "solicitar_cpf": resultado.get("solicitar_cpf"),
-                    "mensagem_recebida": texto_mensagem[:50] + "..." if len(texto_mensagem) > 50 else texto_mensagem
-                }
-            )
+            if list_response:
+                # É UMA RESPOSTA DE MENU INTERATIVO
+                # --------------------------------
+                single_select = list_response.get('singleSelectReply', {})
+                row_id = single_select.get('selectedRowId')
+                opcao_selecionada = list_response.get('title', 'Opção não identificada')
+                
+                logger.info(f"📋 RESPOSTA DE MENU de {nome_remetente}: {opcao_selecionada}")
+                logger.info(f"🎯 Row ID capturado: {row_id}")
+                
+                # CORREÇÃO: Verificar se é resposta de menu de CLIENTE (confirmação de endereço)
+                if row_id in ["confirmar_endereco_sim", "confirmar_endereco_nao"]:
+                    # É resposta de confirmação de endereço do CLIENTE
+                    logger.info(f"🏠 Processando confirmação de endereço do CLIENTE: {row_id}")
+                    resultado_menu = whatsapp_service.processar_coleta_expandida_cliente(
+                        remetente=remetente,
+                        mensagem=row_id,
+                        message_id=message_id
+                    )
+                else:
+                    # É resposta de menu de COLABORADOR
+                    logger.info(f"🔄 Processando resposta de menu do COLABORADOR: {row_id}")
+                    resultado_menu = whatsapp_service.processar_resposta_menu_colaborador(
+                        remetente=remetente,
+                        row_id=row_id,
+                        webhook_data=webhook_data
+                    )
+                logger.info(f"✅ Resultado do processamento: {resultado_menu}")
+                
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "status": "menu_processado",
+                        "remetente": remetente,
+                        "nome_remetente": nome_remetente,
+                        "opcao_selecionada": opcao_selecionada,
+                        "row_id": row_id,
+                        "acao_executada": resultado_menu.get("acao_executada"),
+                        "sucesso": resultado_menu.get("sucesso")
+                    }
+                )
+            
+            else:
+                # É UMA MENSAGEM DE TEXTO NORMAL
+                # -----------------------------
+                logger.info(f"💬 Mensagem de {nome_remetente}: {texto_mensagem}")
+                
+                # Interpretar mensagem do usuário com IA
+                resultado = whatsapp_service.interpretar_mensagem_usuario(remetente, texto_mensagem, message_id)
+                
+                # NOVO: Verificar se está em modo buffer (aguardando mais mensagens)
+                if resultado.get("buffering"):
+                    # Mensagem adicionada ao buffer, aguardando mais mensagens
+                    logger.debug(f"⏳ Mensagem em buffer para {nome_remetente}")
+                    return JSONResponse(
+                        status_code=200,
+                        content={
+                            "status": "buffering",
+                            "remetente": remetente,
+                            "nome_remetente": nome_remetente,
+                            "mensagem_original": resultado.get("mensagem_original"),
+                            "aguardando_mais_mensagens": True
+                        }
+                    )
+                
+                # Processamento normal (com ou sem agregação)
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "status": "interpretado",
+                        "remetente": remetente,
+                        "nome_remetente": nome_remetente,
+                        "cpf_encontrado": resultado.get("cpf"),
+                        "solicitar_cpf": resultado.get("solicitar_cpf"),
+                        "mensagem_recebida": texto_mensagem[:50] + "..." if len(texto_mensagem) > 50 else texto_mensagem,
+                        "buffer_usado": resultado.get("buffer_usado", False)
+                    }
+                )
         else:
             # Mensagem não válida ou tipo não suportado
             return JSONResponse(status_code=200, content={"status": "ignorado"})
@@ -142,6 +216,86 @@ async def test_send_message(telefone: str, mensagem: str = "Teste do Agente IA")
             }
         )
 
+@app.get("/buffer/status")
+async def buffer_status():
+    """
+    Endpoint para verificar status do buffer de mensagens
+    """
+    try:
+        if not whatsapp_service.message_buffer:
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "buffer_disponivel": False,
+                    "motivo": "MessageBufferService não inicializado"
+                }
+            )
+        
+        metricas = whatsapp_service.message_buffer.obter_metricas()
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "buffer_disponivel": True,
+                "status": "ativo" if whatsapp_service.message_buffer.enabled else "desabilitado",
+                "metricas": metricas
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao obter status do buffer: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "buffer_disponivel": False,
+                "erro": str(e)
+            }
+        )
+
+@app.post("/buffer/force-process/{telefone}")
+async def force_process_buffer(telefone: str):
+    """
+    Força o processamento de um buffer específico (para testes)
+    """
+    try:
+        if not whatsapp_service.message_buffer:
+            return JSONResponse(
+                status_code=400,
+                content={"erro": "MessageBufferService não disponível"}
+            )
+        
+        mensagem_agregada = whatsapp_service.message_buffer.force_process_buffer(telefone)
+        
+        if mensagem_agregada:
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "sucesso": True,
+                    "telefone": telefone,
+                    "mensagem_agregada": mensagem_agregada,
+                    "acao": "buffer_processado_forcadamente"
+                }
+            )
+        else:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "sucesso": False,
+                    "telefone": telefone,
+                    "motivo": "Nenhum buffer encontrado para este telefone"
+                }
+            )
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao forçar processamento: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "sucesso": False,
+                "erro": str(e)
+            }
+        )
+
 if __name__ == "__main__":
     logger.info("🚀 Iniciando Sistema de Locação - Toca Imóveis...")
     
@@ -156,7 +310,7 @@ if __name__ == "__main__":
     logger.info("✅ Configurações validadas")
     logger.info("📱 WhatsApp W-API configurado")
     logger.info("🌐 Servidor iniciando na porta 8000")
-    logger.info("🏠 Toca Imóveis - Sistema pronto para atender!")
+    logger.info(" Sistema pronto para atender!")
     
     # Iniciar servidor
     uvicorn.run(
