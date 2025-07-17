@@ -533,48 +533,6 @@ def processar_cliente_completo(cpf: str, telefone: str = None) -> dict:
             "mensagem": "Desculpe, tive um problema ao verificar suas informações. Por favor, tente novamente em alguns instantes."
         }
 
-def processar_colaborador(dados_colaborador: Dict[str, Any], nome_setor: str) -> Dict[str, Any]:
-    """
-    Processa os dados do colaborador e gera mensagem de boas-vindas
-    """
-    company_name = os.getenv('COMPANY_NAME', 'Locação Online')
-    
-    try:
-        dados_usuario = {
-            "id": dados_colaborador.get('id'),
-            "nome": dados_colaborador.get('full_name') or "Nome não informado",
-            "email": dados_colaborador.get('email'),
-            "username": dados_colaborador.get('username'),
-            "setor": nome_setor,
-            "funcao": dados_colaborador.get('role', 'admin'),
-            "ativo": dados_colaborador.get('is_active', True),
-            "criado_em": dados_colaborador.get('created_at')
-        }
-        
-        # Montar mensagem personalizada para colaborador
-        mensagem = (
-            f"Olá {dados_usuario['nome']}! 👋\n"
-            f"✅ Acesso autorizado como Colaborador da {company_name}\n"
-            f"Setor: {dados_usuario['setor']}"
-        )
-        
-        logger.info("✅ Colaborador processado com sucesso")
-        
-        return {
-            "tipo": "colaborador",
-            "cpf_valido": True,
-            "dados_usuario": dados_usuario,
-            "mensagem": mensagem,
-            "debug": {
-                "etapa": "colaborador_encontrado",
-                "setor_raw": dados_colaborador.get('company_sectors', {}),
-                "setor_processado": nome_setor
-            }
-        }
-    except Exception as e:
-        logger.error(f"❌ Erro ao processar colaborador: {str(e)}")
-        raise
-
 def identificar_tipo_usuario(cpf: str, telefone: str = None) -> dict:
     """
     Identifica se o CPF pertence a um colaborador ou cliente
@@ -660,10 +618,9 @@ def identificar_tipo_usuario(cpf: str, telefone: str = None) -> dict:
                 }
             
             # Montar mensagem personalizada para colaborador
-            company_name = os.getenv('COMPANY_NAME', 'Locação Online')
             mensagem = (
                 f"Olá {dados_usuario['nome']}! 👋\n"
-                f"✅ Acesso autorizado como Colaborador da {company_name}\n"
+                f"✅ Acesso autorizado como Colaborador da Toca Imóveis\n"
                 f"Setor: {dados_usuario['setor']}"
             )
             

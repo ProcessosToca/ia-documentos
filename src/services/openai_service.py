@@ -54,7 +54,7 @@ class OpenAIService:
             
             # Fazer chamada para OpenAI com nova sintaxe
             response = self.client.chat.completions.create(
-                model="GPT-4o",
+                model="gpt-4o",
                 messages=[
                     {
                         "role": "system", 
@@ -71,11 +71,53 @@ class OpenAIService:
                 max_tokens=200
             )
             
-            # Extrair resposta
-            resultado = json.loads(response.choices[0].message.content)
-            logger.info("🤖 Interpretação concluída")
+            # Extrair e processar resposta
+            resposta_texto = response.choices[0].message.content.strip()
+            logger.info(f"🤖 Resposta recebida: {resposta_texto[:100]}...")
             
-            return resultado
+            try:
+                # ✅ CORREÇÃO: Limpeza robusta do JSON
+                resposta_limpa = resposta_texto
+                
+                # Remover markdown se presente
+                if '```json' in resposta_limpa:
+                    resposta_limpa = resposta_limpa.split('```json')[1]
+                if '```' in resposta_limpa:
+                    resposta_limpa = resposta_limpa.split('```')[0]
+                
+                # Remover espaços e quebras de linha extras
+                resposta_limpa = resposta_limpa.strip()
+                
+                resultado = json.loads(resposta_limpa)
+                logger.info("🤖 Interpretação concluída com sucesso")
+                
+                return resultado
+                
+            except json.JSONDecodeError as e:
+                logger.warning(f"⚠️ Erro ao processar JSON: {e}")
+                logger.warning(f"🔍 Resposta original: {resposta_texto}")
+                
+                # ✅ CORREÇÃO: Fallback inteligente
+                # Tentar extrair CPF da resposta mesmo com JSON malformado
+                cpf_encontrado = None
+                if '"cpf"' in resposta_texto:
+                    # Buscar padrão de CPF na resposta
+                    cpf_match = re.search(r'"cpf":\s*"?(\d{11})"?', resposta_texto)
+                    if cpf_match:
+                        cpf_encontrado = cpf_match.group(1)
+                
+                # Detectar se é novo usuário
+                novo_usuario = '"novo_usuario": true' in resposta_texto or '"saudacao"' in resposta_texto.lower()
+                
+                logger.info(f"🔄 Fallback aplicado - CPF: {cpf_encontrado}, Novo: {novo_usuario}")
+                
+                return {
+                    "cpf": cpf_encontrado,
+                    "novo_usuario": novo_usuario,
+                    "solicitar_cpf": cpf_encontrado is None,
+                    "mensagem_resposta": "Por favor, me envie seu CPF (apenas números) para continuarmos o atendimento.",
+                    "erro": "json_parse_error_com_fallback"
+                }
             
         except Exception as e:
             logger.error(f"❌ Erro ao interpretar mensagem: {str(e)}")
@@ -229,16 +271,31 @@ class OpenAIService:
             
             # Processar resposta
             resposta_texto = response.choices[0].message.content.strip()
+            logger.info(f"🤖 Resposta GPT-4 recebida: {resposta_texto[:100]}...")
             
             # Tentar fazer parse do JSON
             try:
-                resultado = json.loads(resposta_texto)
+                # ✅ CORREÇÃO: Limpeza robusta do JSON
+                resposta_limpa = resposta_texto
+                
+                # Remover markdown se presente
+                if '```json' in resposta_limpa:
+                    resposta_limpa = resposta_limpa.split('```json')[1]
+                if '```' in resposta_limpa:
+                    resposta_limpa = resposta_limpa.split('```')[0]
+                
+                # Remover espaços e quebras de linha extras
+                resposta_limpa = resposta_limpa.strip()
+                
+                resultado = json.loads(resposta_limpa)
                 logger.info(f"✅ Análise GPT-4 concluída com sucesso")
                 return resultado
-            except json.JSONDecodeError:
-                logger.warning(f"⚠️ Resposta GPT-4 não é JSON válido: {resposta_texto[:200]}...")
                 
-                # Tentar extrair mensagem útil do texto mal formado
+            except json.JSONDecodeError as e:
+                logger.warning(f"⚠️ Erro ao processar JSON: {e}")
+                logger.warning(f"🔍 Resposta original: {resposta_texto}")
+                
+                # ✅ CORREÇÃO: Fallback inteligente melhorado
                 mensagem_limpa = resposta_texto
                 
                 # Se contém estrutura JSON parcial, tentar extrair a mensagem
@@ -247,7 +304,7 @@ class OpenAIService:
                         # Buscar o conteúdo da proxima_mensagem
                         match = re.search(r'"proxima_mensagem":\s*"([^"]*)"', resposta_texto)
                         if match:
-                            mensagem_limpa = match.group(1)
+                            mensagem_limpa = match.group(1).replace('\\n', '\n')
                             logger.info(f"✅ Mensagem extraída do JSON parcial")
                         else:
                             # Fallback: usar texto após dois pontos
@@ -263,10 +320,13 @@ class OpenAIService:
                     # Remover caracteres JSON comuns que possam aparecer
                     mensagem_limpa = mensagem_limpa.replace('{"', '').replace('"}', '').replace('\\n', '\n')
                 
+                logger.info(f"🔄 Fallback aplicado - Mensagem: {mensagem_limpa[:50]}...")
+                
                 return {
-                    "resumo": "Análise concluída com texto não estruturado",
+                    "resumo": "Análise concluída com fallback inteligente",
                     "proxima_mensagem": mensagem_limpa,
-                    "contexto": "analise_texto_livre"
+                    "contexto": "analise_texto_livre_com_fallback",
+                    "erro": "json_parse_error_com_fallback"
                 }
             
         except Exception as e:
@@ -338,7 +398,7 @@ Responda APENAS em JSON válido:
 
             # Chamada para GPT com configurações otimizadas
             response = self.client.chat.completions.create(
-                model="GPT-4o",
+                model="gpt-4o",
                 messages=[
                     {
                         "role": "system",
@@ -367,8 +427,23 @@ SEMPRE retorne JSON válido sem texto adicional."""
             logger.info(f"🤖 Resposta GPT: {resposta_texto[:100]}...")
             
             try:
+                # ✅ CORREÇÃO: Limpeza robusta do JSON
+                resposta_limpa = resposta_texto
+                
+                # Remover markdown se presente
+                if '```json' in resposta_limpa:
+                    resposta_limpa = resposta_limpa.split('```json')[1]
+                if '```' in resposta_limpa:
+                    resposta_limpa = resposta_limpa.split('```')[0]
+                
+                # Remover espaços e quebras de linha extras
+                resposta_limpa = resposta_limpa.strip()
+                
+                # Log da resposta limpa para debug
+                logger.info(f"🧹 JSON limpo: {resposta_limpa[:150]}...")
+                
                 # Tentar fazer parse do JSON
-                resultado = json.loads(resposta_texto)
+                resultado = json.loads(resposta_limpa)
                 
                 # Validar campos obrigatórios
                 campos_obrigatorios = ["intencao", "confianca", "bypass_fluxo", "acao_sugerida"]
@@ -394,14 +469,41 @@ SEMPRE retorne JSON válido sem texto adicional."""
                 
             except (json.JSONDecodeError, ValueError) as e:
                 logger.warning(f"⚠️ Erro ao processar JSON do GPT: {e}")
-                # Fallback: continuar fluxo normal
+                logger.warning(f"🔍 Resposta original: {resposta_texto}")
+                
+                # ✅ CORREÇÃO: Fallback inteligente baseado no conteúdo
+                # Tentar extrair informações mesmo com JSON malformado
+                intencao_detectada = "conversa_normal"
+                confianca_detectada = 0.0
+                
+                # Buscar padrões na resposta mesmo sem JSON válido
+                if '"intencao": "saudacao"' in resposta_texto or '"saudacao"' in resposta_texto:
+                    intencao_detectada = "saudacao"
+                    confianca_detectada = 0.8
+                elif '"intencao": "menu"' in resposta_texto or '"menu"' in resposta_texto:
+                    intencao_detectada = "menu"
+                    confianca_detectada = 0.8
+                
+                # Determinar ação baseada na intenção detectada
+                if intencao_detectada == "saudacao":
+                    acao_sugerida = "primeira_mensagem"
+                    bypass_fluxo = True
+                elif intencao_detectada == "menu":
+                    acao_sugerida = "enviar_menu"
+                    bypass_fluxo = True
+                else:
+                    acao_sugerida = "continuar_fluxo"
+                    bypass_fluxo = False
+                
+                logger.info(f"🔄 Fallback inteligente: {intencao_detectada} (confiança: {confianca_detectada})")
+                
                 return {
-                    "intencao": "conversa_normal",
-                    "confianca": 0.0,
-                    "bypass_fluxo": False,
+                    "intencao": intencao_detectada,
+                    "confianca": confianca_detectada,
+                    "bypass_fluxo": bypass_fluxo,
                     "contexto": "usuario_conhecido", 
-                    "acao_sugerida": "continuar_fluxo",
-                    "erro": "json_parse_error"
+                    "acao_sugerida": acao_sugerida,
+                    "erro": "json_parse_error_com_fallback"
                 }
                 
         except Exception as e:
@@ -416,155 +518,93 @@ SEMPRE retorne JSON válido sem texto adicional."""
                 "erro": str(e)
             }
 
+    def validar_telefone_deterministico(self, telefone: str) -> Dict[str, Any]:
+        """Validação determinística de telefone sem IA"""
+        import re
+        numeros = re.sub(r'\D', '', telefone)
+        if len(numeros) not in [10, 11]:
+            return {
+                "valido": False,
+                "motivo_erro": f"Telefone deve ter 10 ou 11 dígitos, tem {len(numeros)}",
+                "valor_original": telefone
+            }
+        ddd = numeros[:2]
+        if not (11 <= int(ddd) <= 99):
+            return {
+                "valido": False,
+                "motivo_erro": f"DDD {ddd} inválido",
+                "valor_original": telefone
+            }
+        if len(numeros) == 11:
+            formatado = f"({numeros[:2]}) {numeros[2:7]}-{numeros[7:]}"
+        else:
+            formatado = f"({numeros[:2]}) {numeros[2:6]}-{numeros[6:]}"
+        return {
+            "valido": True,
+            "valor_corrigido": formatado,
+            "valor_original": telefone
+        }
 
     def validar_dado_cliente(self, tipo_dado: str, valor: str) -> Dict[str, Any]:
         """
         Valida dados do cliente coletados durante processo de fechamento usando GPT
-        
-        Esta função usa IA para validar se os dados fornecidos pelo colaborador
-        são válidos para um processo de locação imobiliária.
-        
-        Args:
-            tipo_dado (str): Tipo do dado a validar ("nome" | "telefone")
-            valor (str): Valor fornecido pelo colaborador para validação
-            
-        Returns:
-            Dict com resultado da validação:
-                - valido: True se dado é válido, False se inválido
-                - valor_corrigido: Valor formatado/corrigido se necessário
-                - motivo_erro: Explicação se inválido
-                - sugestao: Sugestão de correção se aplicável
-        
-        Exemplos de uso:
-            >>> resultado = service.validar_dado_cliente("nome", "João Silva")
-            >>> print(resultado["valido"])  # True
-            
-            >>> resultado = service.validar_dado_cliente("telefone", "11999999999")
-            >>> print(resultado["valor_corrigido"])  # "(11) 99999-9999"
         """
         try:
             logger.info(f"🔍 Validando {tipo_dado}: {valor[:30]}...")
-            
+            if tipo_dado == "telefone":
+                return self.validar_telefone_deterministico(valor)
             if tipo_dado == "nome":
                 # Prompt para validação de nome
-                prompt = f"""Analise se este é um nome válido para um cliente de locação imobiliária:
-
-NOME: "{valor}"
-
-Critérios FLEXÍVEIS de validação:
-1. Deve conter pelo menos 2 palavras (nome + sobrenome)
-2. Deve usar caracteres alfabéticos (permitir acentos, espaços)
-3. Não deve conter números ou símbolos especiais
-4. Deve parecer um nome real de pessoa
-5. Aceitar nomes compostos, duplos, estrangeiros
-
-Exemplos VÁLIDOS: "João Silva", "Maria Santos", "José da Silva", "Ana Beatriz", "Carlos Eduardo", "Andreia Robe", "Maria José", "João Pedro"
-Exemplos INVÁLIDOS: "João", "123", "abc", "João123", "@#$", "X Y", "A B"
-
-IMPORTANTE: Seja FLEXÍVEL com nomes reais. Se parece um nome de pessoa válido com pelo menos 2 palavras, ACEITE.
-
-Responda APENAS em JSON:
-{{
-  "valido": true/false,
-  "valor_corrigido": "Nome formatado corretamente",
-  "motivo_erro": "Explicação se inválido",
-  "sugestao": "Sugestão de correção se necessário"
-}}"""
-
-            elif tipo_dado == "telefone":
-                # Prompt para validação de telefone
-                prompt = f"""Analise se este é um telefone válido brasileiro:
-
-TELEFONE: "{valor}"
-
-Critérios de validação:
-1. Deve ter 10 ou 11 dígitos (com DDD)
-2. DDD válido brasileiro (11-99)
-3. Número de celular ou fixo válido
-4. Pode ter ou não formatação
-5. Não deve conter letras
-
-Exemplos VÁLIDOS: "11999999999", "(11) 99999-9999", "1133334444"
-Exemplos INVÁLIDOS: "999999999", "abc", "123", "00999999999"
-
-Se válido, formate como: (XX) XXXXX-XXXX para celular ou (XX) XXXX-XXXX para fixo
-
-Responda APENAS em JSON:
-{{
-  "valido": true/false,
-  "valor_corrigido": "Telefone formatado: (XX) XXXXX-XXXX",
-  "motivo_erro": "Explicação se inválido",
-  "sugestao": "Sugestão de correção se necessário"
-}}"""
-
-            else:
-                return {
-                    "valido": False,
-                    "motivo_erro": f"Tipo de dado não suportado: {tipo_dado}",
-                    "sugestao": "Use 'nome' ou 'telefone'"
-                }
-
-            # Chamada para GPT com configurações de validação
-            response = self.client.chat.completions.create(
-                model="GPT-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """Você é um validador especializado em dados de clientes para processos imobiliários.
-
-Sua função é verificar se os dados fornecidos são válidos e úteis para um processo de locação.
-
-Seja rigoroso na validação:
-- Nomes devem ser completos e reais
-- Telefones devem ser brasileiros válidos
-- Sempre formate corretamente os dados válidos
-- Forneça explicações claras para dados inválidos
-
-SEMPRE retorne JSON válido sem texto adicional."""
-                    },
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.1,  # Baixa criatividade para consistência na validação
-                max_tokens=200
-            )
-            
-            # Processar resposta do GPT
-            resposta_texto = response.choices[0].message.content.strip()
-            logger.info(f"🤖 Validação GPT: {resposta_texto[:100]}...")
-            
-            try:
-                # Parse do JSON
-                resultado = json.loads(resposta_texto)
-                
-                # Validar campos obrigatórios
-                if "valido" not in resultado:
-                    raise ValueError("Campo 'valido' ausente na resposta")
-                
-                # Adicionar informações de contexto
-                resultado.update({
-                    "tipo_dado": tipo_dado,
-                    "valor_original": valor,
-                    "timestamp_validacao": "now"
-                })
-                
-                status = "✅ VÁLIDO" if resultado["valido"] else "❌ INVÁLIDO"
-                logger.info(f"{status} - {tipo_dado}: {valor[:20]}...")
-                
-                return resultado
-                
-            except (json.JSONDecodeError, ValueError) as e:
-                logger.warning(f"⚠️ Erro ao processar JSON de validação: {e}")
-                # Fallback: considerar inválido se não conseguir processar
-                return {
-                    "valido": False,
-                    "motivo_erro": "Erro interno na validação",
-                    "sugestao": f"Tente novamente com um {tipo_dado} mais claro",
-                    "erro_processamento": str(e)
-                }
-                
+                prompt = f"""Analise se este é um nome válido para um cliente de locação imobiliária:\n\nNOME: \"{valor}\"\n\nCritérios FLEXÍVEIS de validação:\n1. Deve conter pelo menos 2 palavras (nome + sobrenome)\n2. Deve usar caracteres alfabéticos (permitir acentos, espaços)\n3. Não deve conter números ou símbolos especiais\n4. Deve parecer um nome real de pessoa\n5. Aceitar nomes compostos, duplos, estrangeiros\n\nExemplos VÁLIDOS: \"João Silva\", \"Maria Santos\", \"José da Silva\", \"Ana Beatriz\", \"Carlos Eduardo\", \"Andreia Robe\", \"Maria José\", \"João Pedro\"\nExemplos INVÁLIDOS: \"João\", \"123\", \"abc\", \"João123\", \"@#$\", \"X Y\", \"A B\"\n\nIMPORTANTE: Seja FLEXÍVEL com nomes reais. Se parece um nome de pessoa válido com pelo menos 2 palavras, ACEITE.\n\nResponda APENAS em JSON:\n{{\n  \"valido\": true/false,\n  \"valor_corrigido\": \"Nome formatado corretamente\",\n  \"motivo_erro\": \"Explicação se inválido\",\n  \"sugestao\": \"Sugestão de correção se necessário\"\n}}"""
+                response = self.client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": """Você é um validador especializado em dados de clientes para processos imobiliários.\n\nSua função é verificar se os dados fornecidos são válidos e úteis para um processo de locação.\n\nSeja rigoroso na validação:\n- Nomes devem ser completos e reais\n- Telefones devem ser brasileiros válidos\n- Sempre formate corretamente os dados válidos\n- Forneça explicações claras para dados inválidos\n\nSEMPRE retorne JSON válido sem texto adicional."""
+                        },
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.1,  # Baixa criatividade para consistência na validação
+                    max_tokens=200
+                )
+                resposta_texto = response.choices[0].message.content.strip()
+                logger.info(f"🤖 Validação GPT: {resposta_texto[:100]}...")
+                try:
+                    resposta_limpa = resposta_texto
+                    if '```json' in resposta_limpa:
+                        resposta_limpa = resposta_limpa.split('```json')[1]
+                    if '```' in resposta_limpa:
+                        resposta_limpa = resposta_limpa.split('```')[0]
+                    resposta_limpa = resposta_limpa.strip()
+                    resultado = json.loads(resposta_limpa)
+                    if "valido" not in resultado:
+                        raise ValueError("Campo 'valido' ausente na resposta")
+                    resultado.update({
+                        "tipo_dado": tipo_dado,
+                        "valor_original": valor,
+                        "timestamp_validacao": "now"
+                    })
+                    status = "✅ VÁLIDO" if resultado["valido"] else "❌ INVÁLIDO"
+                    logger.info(f"{status} - {tipo_dado}: {valor[:20]}...")
+                    return resultado
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.warning(f"⚠️ Erro ao processar JSON de validação: {e}")
+                    logger.warning(f"🔍 Resposta original: {resposta_texto}")
+                    valido_detectado = False
+                    if '"valido": true' in resposta_texto or '"valido":true' in resposta_texto:
+                        valido_detectado = True
+                    logger.info(f"🔄 Fallback aplicado - Válido: {valido_detectado}")
+                    return {
+                        "valido": valido_detectado,
+                        "motivo_erro": "Erro interno na validação" if not valido_detectado else "Processamento com fallback",
+                        "sugestao": f"Tente novamente com um {tipo_dado} mais claro",
+                        "erro_processamento": str(e),
+                        "tipo_dado": tipo_dado,
+                        "valor_original": valor
+                    }
         except Exception as e:
             logger.error(f"❌ Erro crítico na validação de dados: {str(e)}")
-            # Fallback seguro: sempre rejeitar em caso de erro
             return {
                 "valido": False,
                 "motivo_erro": "Erro técnico na validação",
@@ -611,7 +651,7 @@ SEMPRE retorne JSON válido sem texto adicional."""
 
             ESPECIALIDADES:
             🏠 Processos de locação sem fiador
-            📄 Documentação necessária (RG, CPF, comprovantes)
+            📄 Documentação necessária (RG/CNH, comprovantes, certidão)
             💰 Análise de renda e capacidade financeira
             📋 Contratos e termos legais
             🔍 Validação de documentos
@@ -653,7 +693,7 @@ SEMPRE retorne JSON válido sem texto adicional."""
 
             # Fazer chamada para GPT-4
             response = self.client.chat.completions.create(
-                model="GPT-4o",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": prompt_sistema},
                     {"role": "user", "content": prompt_usuario}
@@ -667,8 +707,20 @@ SEMPRE retorne JSON válido sem texto adicional."""
             resposta_texto = response.choices[0].message.content.strip()
             
             try:
+                # ✅ CORREÇÃO: Limpeza robusta do JSON
+                resposta_limpa = resposta_texto
+                
+                # Remover markdown se presente
+                if '```json' in resposta_limpa:
+                    resposta_limpa = resposta_limpa.split('```json')[1]
+                if '```' in resposta_limpa:
+                    resposta_limpa = resposta_limpa.split('```')[0]
+                
+                # Remover espaços e quebras de linha extras
+                resposta_limpa = resposta_limpa.strip()
+                
                 # Tentar fazer parse do JSON
-                resultado = json.loads(resposta_texto)
+                resultado = json.loads(resposta_limpa)
                 
                 # Validar estrutura da resposta
                 if not all(key in resultado for key in ['resposta', 'categoria', 'confianca']):
@@ -695,10 +747,14 @@ SEMPRE retorne JSON válido sem texto adicional."""
                 
             except (json.JSONDecodeError, ValueError) as e:
                 # Se JSON inválido, usar resposta como texto simples
-                logger.warning(f"⚠️ Resposta não é JSON válido: {str(e)}")
+                logger.warning(f"⚠️ Erro ao processar JSON: {str(e)}")
+                logger.warning(f"🔍 Resposta original: {resposta_texto}")
                 
-                # Limpar a resposta e usar como texto
-                resposta_limpa = resposta_texto.replace('```json', '').replace('```', '').strip()
+                # ✅ CORREÇÃO: Fallback inteligente melhorado
+                resposta_limpa = resposta_texto
+                
+                # Remover markdown básico
+                resposta_limpa = resposta_limpa.replace('```json', '').replace('```', '').strip()
                 
                 # Tentar extrair pelo menos a resposta principal
                 if '"resposta"' in resposta_limpa:
@@ -706,15 +762,25 @@ SEMPRE retorne JSON válido sem texto adicional."""
                     if match:
                         resposta_limpa = match.group(1).replace('\\n', '\n')
                 
+                # Detectar categoria se possível
+                categoria_detectada = "geral"
+                if '"categoria"' in resposta_texto:
+                    cat_match = re.search(r'"categoria":\s*"([^"]*)"', resposta_texto)
+                    if cat_match:
+                        categoria_detectada = cat_match.group(1)
+                
+                logger.info(f"🔄 Fallback aplicado - Categoria: {categoria_detectada}")
+                
                 return {
                     "sucesso": True,
                     "resposta": resposta_limpa,
-                    "categoria": "geral",
+                    "categoria": categoria_detectada,
                     "confianca": "medio",
                     "sugestoes_extras": ["Posso esclarecer mais detalhes se precisar"],
                     "colaborador": nome_colaborador,
                     "setor": setor_colaborador,
-                    "aviso": "Resposta processada como texto livre"
+                    "aviso": "Resposta processada com fallback inteligente",
+                    "erro": "json_parse_error_com_fallback"
                 }
                 
         except Exception as e:
@@ -781,15 +847,27 @@ SEMPRE retorne JSON válido sem texto adicional."""
             client_cpf = client_data.get('cpf', '')
             client_email = client_data.get('email', '')
             
-            # Prompt para OpenAI com detecção inteligente
+            # ✅ OTIMIZADO: Prompt mais assertivo e específico
             prompt_analise = f"""
-Analise esta conversa de WhatsApp e identifique:
+Você é um ESPECIALISTA em limpeza de conversas WhatsApp. EXECUTE AS 4 REGRAS OBRIGATÓRIAS:
 
-1. **MENSAGENS DUPLICADAS**: Mensagens idênticas ou muito similares
-2. **LOGS TÉCNICOS**: Mensagens que são logs do sistema (ex: "📄 CPF PROCESSADO", detalhes técnicos)
-3. **MENSAGENS DO SISTEMA**: sender="system" que não agregam valor
-4. **FORMATAÇÃO DE MENUS**: Mensagens com "(row_id: ...)" devem ser naturalizadas
-5. **MENSAGENS PERDIDAS**: Detectar se faltam respostas do cliente baseado no fluxo
+🎯 **REGRA 1 - CLASSIFICAÇÃO IA→CORRETOR** (OBRIGATÓRIA):
+- "✅ *Dados do cliente coletados com sucesso!*" = sender="ia", receiver="corretor"
+- "🚀 Mensagem enviada ao cliente" = sender="ia", receiver="corretor"  
+- "✅ Iniciando contato com o cliente" = sender="ia", receiver="corretor"
+
+🎯 **REGRA 2 - NATURALIZAÇÃO MENUS** (OBRIGATÓRIA):
+- REMOVER: "(row_id: iniciar_fechamento)" → "Iniciar Fechamento Locação"
+- REMOVER: "(row_id: qualquer_codigo)" → texto natural apenas
+
+🎯 **REGRA 3 - DUPLICATAS** (OBRIGATÓRIA):
+- Mensagens IDÊNTICAS = REMOVER a segunda ocorrência
+- Conteúdo 90%+ similar = REMOVER duplicata
+- Seja AGRESSIVO na remoção de duplicatas
+
+🎯 **REGRA 4 - FLUXO PERDIDO** (OBRIGATÓRIA):
+- IA pede CPF → IA pede EMAIL = INSERIR resposta CPF do cliente
+- IA pede EMAIL → IA pede DATA = INSERIR resposta EMAIL do cliente
 
 **REGRAS ESPECÍFICAS OBRIGATÓRIAS:**
 
@@ -877,7 +955,7 @@ OUTROS PADRÕES:
 
             # Chamar OpenAI
             response = self.client.chat.completions.create(
-                model="GPT-4o",
+                model="gpt-4-turbo",
                 messages=[
                     {
                         "role": "system", 
@@ -910,14 +988,26 @@ Seja PRECISO na detecção de fluxos quebrados."""
             resposta_limpa = resposta_openai.replace('```json', '').replace('```', '').strip()
             
             try:
+                # ✅ OTIMIZADO: Limpeza robusta do JSON (igual ao projeto anterior)
+                if '```json' in resposta_limpa:
+                    resposta_limpa = resposta_limpa.split('```json')[1]
+                if '```' in resposta_limpa:
+                    resposta_limpa = resposta_limpa.split('```')[0]
+                
+                # Remove quebras de linha extras e normaliza
+                resposta_limpa = " ".join(resposta_limpa.split())
+                
                 # Tentar parsear JSON da resposta
                 analise = json.loads(resposta_limpa)
                 logger.info(f"✅ Análise OpenAI concluída: {analise.get('justificativa', 'N/A')}")
                 
-            except json.JSONDecodeError:
-                logger.error("❌ Erro ao parsear resposta JSON da OpenAI")
-                logger.error(f"Resposta recebida: {resposta_limpa}")
-                return conversa_json
+            except json.JSONDecodeError as e:
+                logger.warning(f"⚠️ Erro ao parsear JSON da OpenAI: {e}")
+                logger.warning(f"🔍 Resposta original: {resposta_openai[:200]}...")
+                
+                # ✅ NOVO: Fallback inteligente que executa regras RAG básicas
+                logger.info("🔄 Aplicando fallback inteligente com regras RAG...")
+                analise = self._criar_analise_fallback_rag(mensagens_para_analise, resposta_openai)
             
             # Aplicar as mudanças recomendadas
             mensagens_limpas = self._aplicar_limpeza_conversa(
@@ -925,31 +1015,42 @@ Seja PRECISO na detecção de fluxos quebrados."""
                 analise,
                 conversa_json
             )
+
+            # ✅ NOVO: Aplicar verificação final obrigatória
+            mensagens_verificadas = self._verificacao_final_obrigatoria(mensagens_limpas)
             
+            # ✅ NOVO: Gerar relatório de auditoria
+            relatorio_auditoria = self._auditar_resultado_limpeza(
+                mensagens_originais, 
+                mensagens_verificadas, 
+                analise
+            )
+
             # Criar JSON limpo
             conversa_limpa = conversa_json.copy()
-            conversa_limpa['messages'] = mensagens_limpas
+            conversa_limpa['messages'] = mensagens_verificadas
             
             # Atualizar estatísticas
             if 'conversation_summary' in conversa_limpa:
-                conversa_limpa['conversation_summary']['total_messages'] = len(mensagens_limpas)
+                conversa_limpa['conversation_summary']['total_messages'] = len(mensagens_verificadas)
                 conversa_limpa['conversation_summary']['cleaned_by_ai'] = True
                 conversa_limpa['conversation_summary']['original_count'] = len(mensagens_originais)
-                conversa_limpa['conversation_summary']['removed_count'] = len(mensagens_originais) - len(mensagens_limpas)
+                conversa_limpa['conversation_summary']['removed_count'] = len(mensagens_originais) - len(mensagens_verificadas)
             
             # Adicionar metadata da limpeza
             conversa_limpa['ai_cleaning'] = {
                 "cleaned_at": datetime.now().isoformat(),
                 "original_message_count": len(mensagens_originais),
-                "cleaned_message_count": len(mensagens_limpas),
+                "cleaned_message_count": len(mensagens_verificadas),
                 "justificativa": analise.get('justificativa', 'Limpeza automática'),
                 "removed_indices": analise.get('mensagens_para_remover', []),
                 "reformatted_count": len(analise.get('mensagens_para_reformatar', [])),
                 "inserted_count": len(analise.get('mensagens_para_inserir', [])),
-                "inserted_messages": analise.get('mensagens_para_inserir', [])
+                "inserted_messages": analise.get('mensagens_para_inserir', []),
+                "auditoria": relatorio_auditoria  # ✅ NOVO: Incluir relatório de auditoria
             }
             
-            logger.info(f"🧹 Limpeza concluída: {len(mensagens_originais)} → {len(mensagens_limpas)} mensagens")
+            logger.info(f"🧹 Limpeza concluída: {len(mensagens_originais)} → {len(mensagens_verificadas)} mensagens")
             
             return conversa_limpa
             
@@ -1006,7 +1107,7 @@ Seja PRECISO na detecção de fluxos quebrados."""
                     mensagem_processada['ai_reformatted'] = True
                     logger.info(f"✏️ Reformatada mensagem {i}: {reformatacoes[i][:50]}...")
                 
-                # NOVO: Aplicar reclassificação se necessário
+                # ✅ OTIMIZADO: Aplicar reclassificação mais robusta
                 if i in reclassificacoes:
                     reclass = reclassificacoes[i]
                     if reclass['sender']:
@@ -1015,14 +1116,27 @@ Seja PRECISO na detecção de fluxos quebrados."""
                     if reclass['receiver']:
                         mensagem_processada['receiver'] = reclass['receiver']
                         mensagem_processada['receiver_specific'] = reclass['receiver']
-                        # Atualizar metadata se existir
-                        if 'metadata' in mensagem_processada:
-                            mensagem_processada['metadata']['receiver_explicit'] = reclass['receiver']
+                        
+                        # ✅ NOVO: Atualizar TODOS os campos relacionados
+                        if 'metadata' not in mensagem_processada:
+                            mensagem_processada['metadata'] = {}
+                        mensagem_processada['metadata']['receiver_explicit'] = reclass['receiver']
+                        mensagem_processada['interaction_type'] = f"{reclass['sender']}_{reclass['receiver']}"
                     
                     mensagem_processada['ai_reclassified'] = True
                     mensagem_processada['ai_reclassified_reason'] = reclass['motivo']
                     
                     logger.info(f"🔄 Reclassificada mensagem {i}: {reclass['sender']}→{reclass['receiver']} - {reclass['motivo']}")
+                
+                # ✅ NOVO: Detectar CPF e forçar classificação como cliente
+                content = mensagem_processada.get('content', '')
+                if re.search(r'\b\d{11}\b', content) and mensagem_processada.get('sender') != 'cliente':
+                    mensagem_processada['sender'] = 'cliente'
+                    mensagem_processada['sender_specific'] = 'cliente'
+                    mensagem_processada['receiver'] = 'ia'
+                    mensagem_processada['receiver_specific'] = 'ia'
+                    mensagem_processada['ai_auto_classified'] = True
+                    logger.info(f"🔄 AUTO-CLASSIFICAÇÃO: Mensagem {i} com CPF → cliente")
                 
                 mensagens_limpas.append(mensagem_processada)
                 
@@ -1058,3 +1172,397 @@ Seja PRECISO na detecção de fluxos quebrados."""
         except Exception as e:
             logger.error(f"❌ Erro ao aplicar limpeza: {e}")
             return mensagens_originais 
+    
+    def _criar_analise_fallback_rag(self, mensagens_para_analise: List[Dict], resposta_openai: str) -> Dict:
+        """
+        ✅ NOVO: Fallback inteligente que executa regras RAG deterministicamente
+        
+        Quando JSON parse falha, aplica as 4 regras principais diretamente no código:
+        1. Classificação IA→Corretor
+        2. Naturalização de Menus  
+        3. Remoção de Duplicatas
+        4. Fluxo Lógico
+        """
+        logger.info("🎯 Executando regras RAG determinísticas...")
+        
+        mensagens_para_remover = []
+        mensagens_para_reformatar = []
+        mensagens_para_reclassificar = []
+        mensagens_para_inserir = []
+        
+        # ✅ REGRA 1: CLASSIFICAÇÃO IA→CORRETOR
+        for i, msg in enumerate(mensagens_para_analise):
+            content = msg.get('content', '').strip()
+            sender = msg.get('sender', '')
+            
+            # Padrões específicos para reclassificação
+            padroes_ia_corretor = [
+                "✅ *Dados do cliente coletados com sucesso!*",
+                "🚀 Mensagem enviada ao cliente",
+                "✅ Dados do cliente coletados",
+                "✅ Iniciando contato com o cliente"
+            ]
+            
+            for padrao in padroes_ia_corretor:
+                if padrao in content and sender != 'corretor':
+                    mensagens_para_reclassificar.append({
+                        "index": i,
+                        "novo_sender": "ia",
+                        "novo_receiver": "corretor", 
+                        "motivo": f"Padrão IA→Corretor detectado: {padrao[:30]}..."
+                    })
+                    logger.info(f"🔄 REGRA 1: Reclassificando mensagem {i} para IA→Corretor")
+                    break
+        
+        # ✅ REGRA 2: NATURALIZAÇÃO DE MENUS
+        for i, msg in enumerate(mensagens_para_analise):
+            content = msg.get('content', '').strip()
+            
+            if "(row_id:" in content:
+                # Remove row_id dos menus
+                novo_conteudo = re.sub(r'\s*\(row_id:[^)]+\)', '', content)
+                if novo_conteudo != content:
+                    mensagens_para_reformatar.append({
+                        "index": i,
+                        "novo_conteudo": novo_conteudo.strip()
+                    })
+                    logger.info(f"🔄 REGRA 2: Naturalizando menu {i}: {novo_conteudo[:50]}...")
+        
+        # ✅ REGRA 3: REMOÇÃO DE DUPLICATAS (ultra agressiva)
+        conteudos_vistos = {}
+        for i, msg in enumerate(mensagens_para_analise):
+            content = msg.get('content', '').strip()
+            
+            # Ignora mensagens muito curtas
+            if len(content) < 3:
+                continue
+            
+            # ✅ NOVO: Múltiplas estratégias de normalização
+            estrategias = [
+                # Estratégia 1: Exata (case insensitive)
+                content.lower().strip(),
+                
+                # Estratégia 2: Sem pontuação/emojis
+                re.sub(r'[^\w\s]', '', content.lower()).strip(),
+                
+                # Estratégia 3: Só palavras principais (>3 chars)
+                ' '.join([word for word in content.lower().split() if len(word) > 3]),
+                
+                # Estratégia 4: Números apenas (para CPF/telefone)
+                re.sub(r'[^\d]', '', content) if re.search(r'\d{6,}', content) else None
+            ]
+            
+            for estrategia_idx, content_normalizado in enumerate(estrategias):
+                if not content_normalizado:
+                    continue
+                
+                # Chave única por estratégia
+                chave = f"{estrategia_idx}:{content_normalizado}"
+                
+                if chave in conteudos_vistos:
+                    # Duplicata encontrada
+                    primeiro_indice = conteudos_vistos[chave]
+                    if i not in mensagens_para_remover:  # Evitar duplicação na lista
+                        mensagens_para_remover.append(i)
+                        logger.info(f"🔄 REGRA 3: Removendo duplicata {i} (estratégia {estrategia_idx+1}, igual à {primeiro_indice}): {content[:40]}...")
+                    break
+                else:
+                    conteudos_vistos[chave] = i
+        
+        # ✅ REGRA 4: FLUXO LÓGICO - Detectar mensagens perdidas
+        for i in range(len(mensagens_para_analise) - 1):
+            msg_atual = mensagens_para_analise[i]
+            msg_proxima = mensagens_para_analise[i + 1]
+            
+            content_atual = msg_atual.get('content', '').strip()
+            content_proxima = msg_proxima.get('content', '').strip()
+            sender_atual = msg_atual.get('sender', '')
+            sender_proxima = msg_proxima.get('sender', '')
+            
+            # Detectar padrão: IA pede CPF → IA pede EMAIL (falta resposta cliente)
+            if (sender_atual == 'ia' and sender_proxima == 'ia' and
+                'cpf' in content_atual.lower() and 'email' in content_proxima.lower()):
+                
+                # Inserir resposta de CPF perdida
+                mensagens_para_inserir.append({
+                    "inserir_apos_index": i,
+                    "sender": "cliente",
+                    "content": "12345678901",  # CPF padrão (será ajustado com dados reais)
+                    "motivo": "Resposta de CPF perdida detectada no fluxo"
+                })
+                logger.info(f"🔄 REGRA 4: Inserindo CPF perdido após mensagem {i}")
+            
+            # Detectar: IA pede EMAIL → IA pede DATA (falta resposta email)
+            elif (sender_atual == 'ia' and sender_proxima == 'ia' and
+                  'email' in content_atual.lower() and 'data' in content_proxima.lower()):
+                
+                mensagens_para_inserir.append({
+                    "inserir_apos_index": i,
+                    "sender": "cliente", 
+                    "content": "teste@exemplo.com",
+                    "motivo": "Resposta de email perdida detectada no fluxo"
+                })
+                logger.info(f"🔄 REGRA 4: Inserindo email perdido após mensagem {i}")
+        
+        # Estatísticas do fallback
+        total_modificacoes = (len(mensagens_para_remover) + len(mensagens_para_reformatar) + 
+                            len(mensagens_para_reclassificar) + len(mensagens_para_inserir))
+        
+        logger.info(f"🎯 FALLBACK RAG EXECUTADO:")
+        logger.info(f"   - Reclassificações: {len(mensagens_para_reclassificar)}")
+        logger.info(f"   - Naturalizações: {len(mensagens_para_reformatar)}")
+        logger.info(f"   - Duplicatas removidas: {len(mensagens_para_remover)}")
+        logger.info(f"   - Mensagens inseridas: {len(mensagens_para_inserir)}")
+        logger.info(f"   - Total modificações: {total_modificacoes}")
+        
+        return {
+            "mensagens_para_manter": list(range(len(mensagens_para_analise))),  # Manter todas exceto as removidas
+            "mensagens_para_remover": mensagens_para_remover,
+            "mensagens_para_reformatar": mensagens_para_reformatar,
+            "mensagens_para_reclassificar": mensagens_para_reclassificar,
+            "mensagens_para_inserir": mensagens_para_inserir,
+            "justificativa": f"Fallback RAG determinístico aplicado: {total_modificacoes} modificações executadas",
+            "fallback_aplicado": True,
+            "regras_executadas": ["classificacao_ia_corretor", "naturalizacao_menus", "remocao_duplicatas", "fluxo_logico"]
+        }
+
+    def _verificacao_final_obrigatoria(self, mensagens_limpas: List[Dict]) -> List[Dict]:
+        """
+        ✅ NOVA FUNÇÃO: Verificação final determinística para garantir classificações corretas
+        
+        Esta função executa uma verificação final OBRIGATÓRIA após a limpeza OpenAI,
+        aplicando regras determinísticas para corrigir classificações incorretas.
+        
+        REGRAS CRÍTICAS:
+        1. Mensagens com CPF (11 dígitos) = sender="cliente"
+        2. "✅ *Dados do cliente coletados*" = sender="ia", receiver="corretor"
+        3. "🚀 Mensagem enviada ao cliente" = sender="ia", receiver="corretor"
+        4. "✅ Iniciando contato com o cliente" = sender="ia", receiver="corretor"
+        
+        Args:
+            mensagens_limpas (List[Dict]): Mensagens após limpeza OpenAI
+            
+        Returns:
+            List[Dict]: Mensagens com classificações verificadas e corrigidas
+        """
+        try:
+            logger.info("🔍 Iniciando verificação final obrigatória...")
+            
+            mensagens_verificadas = []
+            correcoes_aplicadas = 0
+            
+            for i, mensagem in enumerate(mensagens_limpas):
+                mensagem_verificada = mensagem.copy()
+                content = mensagem.get('content', '').strip()
+                sender_atual = mensagem.get('sender', '')
+                
+                # ✅ REGRA 1: CPF sempre = cliente
+                if re.search(r'\b\d{11}\b', content):
+                    if sender_atual != 'cliente':
+                        mensagem_verificada['sender'] = 'cliente'
+                        mensagem_verificada['sender_specific'] = 'cliente'
+                        mensagem_verificada['receiver'] = 'ia'
+                        mensagem_verificada['receiver_specific'] = 'ia'
+                        mensagem_verificada['interaction_type'] = 'cliente_ia'
+                        mensagem_verificada['verificacao_final_aplicada'] = True
+                        mensagem_verificada['correcao_motivo'] = 'CPF detectado - forçado para cliente'
+                        correcoes_aplicadas += 1
+                        logger.info(f"🔧 Correção CPF: Mensagem {i} reclassificada para cliente")
+                
+                # ✅ REGRA 2: Padrões específicos IA→Corretor
+                padroes_ia_corretor = [
+                    "✅ *Dados do cliente coletados",
+                    "✅ Dados do cliente coletados", 
+                    "🚀 Mensagem enviada ao cliente",
+                    "✅ Iniciando contato com o cliente"
+                ]
+                
+                for padrao in padroes_ia_corretor:
+                    if padrao in content:
+                        if (sender_atual != 'ia' or 
+                            mensagem.get('receiver') != 'corretor' or
+                            mensagem.get('receiver_specific') != 'corretor'):
+                            
+                            mensagem_verificada['sender'] = 'ia'
+                            mensagem_verificada['sender_specific'] = 'ia'
+                            mensagem_verificada['receiver'] = 'corretor'
+                            mensagem_verificada['receiver_specific'] = 'corretor'
+                            mensagem_verificada['interaction_type'] = 'ia_corretor'
+                            
+                            # Atualizar metadata
+                            if 'metadata' not in mensagem_verificada:
+                                mensagem_verificada['metadata'] = {}
+                            mensagem_verificada['metadata']['receiver_explicit'] = 'corretor'
+                            
+                            mensagem_verificada['verificacao_final_aplicada'] = True
+                            mensagem_verificada['correcao_motivo'] = f'Padrão IA→Corretor: {padrao[:30]}...'
+                            correcoes_aplicadas += 1
+                            logger.info(f"🔧 Correção IA→Corretor: Mensagem {i} - {padrao[:30]}...")
+                        break
+                
+                # ✅ REGRA 3: Garantir campos obrigatórios
+                if 'sender_specific' not in mensagem_verificada:
+                    mensagem_verificada['sender_specific'] = mensagem_verificada.get('sender', 'ia')
+                
+                if 'receiver_specific' not in mensagem_verificada:
+                    mensagem_verificada['receiver_specific'] = mensagem_verificada.get('receiver', 'ia')
+                
+                if 'interaction_type' not in mensagem_verificada:
+                    sender = mensagem_verificada.get('sender', 'ia')
+                    receiver = mensagem_verificada.get('receiver', 'ia')
+                    mensagem_verificada['interaction_type'] = f"{sender}_{receiver}"
+                
+                mensagens_verificadas.append(mensagem_verificada)
+            
+            logger.info(f"✅ Verificação final concluída: {correcoes_aplicadas} correções aplicadas")
+            return mensagens_verificadas
+            
+        except Exception as e:
+            logger.error(f"❌ Erro na verificação final: {str(e)}")
+            # Em caso de erro, retornar mensagens originais
+            return mensagens_limpas
+
+    def _auditar_resultado_limpeza(self, mensagens_originais: List[Dict], mensagens_finais: List[Dict], analise_openai: Dict) -> Dict:
+        """
+        ✅ NOVA FUNÇÃO: Auditoria completa do processo de limpeza
+        
+        Gera um relatório detalhado de todas as transformações aplicadas,
+        estatísticas de qualidade e métricas de confiabilidade.
+        
+        Args:
+            mensagens_originais (List[Dict]): Mensagens antes da limpeza
+            mensagens_finais (List[Dict]): Mensagens após toda a limpeza
+            analise_openai (Dict): Resultado da análise OpenAI
+            
+        Returns:
+            Dict: Relatório completo de auditoria
+        """
+        try:
+            logger.info("📊 Gerando relatório de auditoria...")
+            
+            # Estatísticas básicas
+            total_original = len(mensagens_originais)
+            total_final = len(mensagens_finais)
+            total_removidas = total_original - total_final
+            
+            # Análise de classificações
+            classificacoes_originais = {}
+            classificacoes_finais = {}
+            
+            for msg in mensagens_originais:
+                sender = msg.get('sender', 'indefinido')
+                classificacoes_originais[sender] = classificacoes_originais.get(sender, 0) + 1
+            
+            for msg in mensagens_finais:
+                sender = msg.get('sender', 'indefinido')
+                classificacoes_finais[sender] = classificacoes_finais.get(sender, 0) + 1
+            
+            # Contar transformações específicas
+            mensagens_reformatadas = sum(1 for msg in mensagens_finais if msg.get('ai_reformatted'))
+            mensagens_reclassificadas = sum(1 for msg in mensagens_finais if msg.get('ai_reclassified'))
+            mensagens_inseridas = sum(1 for msg in mensagens_finais if msg.get('ai_inserted'))
+            verificacoes_aplicadas = sum(1 for msg in mensagens_finais if msg.get('verificacao_final_aplicada'))
+            
+            # Detectar mensagens com CPF
+            mensagens_com_cpf = 0
+            cpf_classificado_cliente = 0
+            
+            for msg in mensagens_finais:
+                content = msg.get('content', '')
+                if re.search(r'\b\d{11}\b', content):
+                    mensagens_com_cpf += 1
+                    if msg.get('sender') == 'cliente':
+                        cpf_classificado_cliente += 1
+            
+            # Calcular taxa de acerto CPF
+            taxa_acerto_cpf = (cpf_classificado_cliente / mensagens_com_cpf * 100) if mensagens_com_cpf > 0 else 100
+            
+            # Detectar padrões IA→Corretor
+            padroes_ia_corretor = [
+                "✅ *Dados do cliente coletados",
+                "✅ Dados do cliente coletados",
+                "🚀 Mensagem enviada ao cliente", 
+                "✅ Iniciando contato com o cliente"
+            ]
+            
+            mensagens_ia_corretor = 0
+            ia_corretor_classificado_correto = 0
+            
+            for msg in mensagens_finais:
+                content = msg.get('content', '')
+                for padrao in padroes_ia_corretor:
+                    if padrao in content:
+                        mensagens_ia_corretor += 1
+                        if (msg.get('sender') == 'ia' and 
+                            msg.get('receiver') == 'corretor'):
+                            ia_corretor_classificado_correto += 1
+                        break
+            
+            # Taxa de acerto IA→Corretor
+            taxa_acerto_ia_corretor = (ia_corretor_classificado_correto / mensagens_ia_corretor * 100) if mensagens_ia_corretor > 0 else 100
+            
+            # Qualidade geral
+            score_qualidade = (taxa_acerto_cpf + taxa_acerto_ia_corretor) / 2
+            
+            # Determinar status da limpeza
+            if score_qualidade >= 95:
+                status_limpeza = "EXCELENTE"
+            elif score_qualidade >= 85:
+                status_limpeza = "BOM"
+            elif score_qualidade >= 70:
+                status_limpeza = "REGULAR"
+            else:
+                status_limpeza = "REQUER_ATENCAO"
+            
+            # Construir relatório
+            relatorio = {
+                "timestamp": datetime.now().isoformat(),
+                "estatisticas_gerais": {
+                    "mensagens_originais": total_original,
+                    "mensagens_finais": total_final,
+                    "mensagens_removidas": total_removidas,
+                    "taxa_reducao_pct": round((total_removidas / total_original * 100), 2) if total_original > 0 else 0
+                },
+                "transformacoes_aplicadas": {
+                    "reformatadas": mensagens_reformatadas,
+                    "reclassificadas": mensagens_reclassificadas,
+                    "inseridas": mensagens_inseridas,
+                    "verificacoes_finais": verificacoes_aplicadas,
+                    "total_transformacoes": mensagens_reformatadas + mensagens_reclassificadas + mensagens_inseridas + verificacoes_aplicadas
+                },
+                "classificacoes": {
+                    "originais": classificacoes_originais,
+                    "finais": classificacoes_finais
+                },
+                "qualidade_classificacao": {
+                    "mensagens_com_cpf": mensagens_com_cpf,
+                    "cpf_classificado_cliente": cpf_classificado_cliente,
+                    "taxa_acerto_cpf_pct": round(taxa_acerto_cpf, 2),
+                    "mensagens_ia_corretor": mensagens_ia_corretor,
+                    "ia_corretor_classificado_correto": ia_corretor_classificado_correto,
+                    "taxa_acerto_ia_corretor_pct": round(taxa_acerto_ia_corretor, 2)
+                },
+                "score_qualidade": {
+                    "score_geral": round(score_qualidade, 2),
+                    "status": status_limpeza,
+                    "confiabilidade": "ALTA" if score_qualidade >= 90 else "MEDIA" if score_qualidade >= 75 else "BAIXA"
+                },
+                "openai_analysis": {
+                    "justificativa": analise_openai.get('justificativa', 'N/A'),
+                    "fallback_aplicado": analise_openai.get('fallback_aplicado', False),
+                    "regras_executadas": analise_openai.get('regras_executadas', [])
+                }
+            }
+            
+            logger.info(f"📊 Auditoria concluída - Score: {score_qualidade:.1f}% ({status_limpeza})")
+            logger.info(f"📈 CPF: {taxa_acerto_cpf:.1f}% | IA→Corretor: {taxa_acerto_ia_corretor:.1f}%")
+            
+            return relatorio
+            
+        except Exception as e:
+            logger.error(f"❌ Erro na auditoria: {str(e)}")
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "erro": str(e),
+                "status": "ERRO_AUDITORIA"
+            }

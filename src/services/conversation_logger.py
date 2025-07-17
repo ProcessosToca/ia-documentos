@@ -68,7 +68,6 @@ class ConversationLogger:
         self.base_path = Path(base_path)
         self.enabled = True
         self.active_conversations = {}  # Cache de conversas ativas
-        self.company_name = os.getenv('COMPANY_NAME', 'Locação Online')
         
         # Garantir que as pastas existem
         self._ensure_directories()
@@ -77,7 +76,7 @@ class ConversationLogger:
     
     def _ensure_directories(self):
         """Garante que todas as pastas necessárias existem"""
-        directories = [ 
+        directories = [
             self.base_path / "em_andamento",
             self.base_path / "finalizadas", 
             self.base_path / "duvidas"
@@ -166,10 +165,6 @@ class ConversationLogger:
                     # ✅ NOVOS METADADOS V2
                     "improvements": ["specific_classification", "phase_separation", "context_awareness"],
                     "supabase_ready": True
-                },
-                "system": {
-                    "type": "system",
-                    "name": f"IA {self.company_name}",
                 }
             }
             
@@ -1319,29 +1314,3 @@ class ConversationLogger:
             logger.error(f"❌ Erro na sincronização com limpeza: {str(e)}")
             # Fallback para sincronização normal
             return self.sincronizar_conversa_supabase(conversation_id, negotiation_id) 
-
-    def get_participants(self, conversation_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Obtém os dados dos participantes de uma conversa
-        
-        Args:
-            conversation_id (str): ID da conversa
-            
-        Returns:
-            Optional[Dict[str, Any]]: Dicionário com dados dos participantes ou None se não encontrar
-        """
-        try:
-            # Tentar obter do cache primeiro
-            if conversation_id in self.active_conversations:
-                return self.active_conversations[conversation_id].get('participants')
-            
-            # Se não estiver no cache, tentar carregar do arquivo
-            conversation = self._carregar_conversa_do_arquivo(conversation_id)
-            if conversation:
-                return conversation.get('participants')
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"❌ Erro ao obter participantes da conversa {conversation_id}: {str(e)}")
-            return None 

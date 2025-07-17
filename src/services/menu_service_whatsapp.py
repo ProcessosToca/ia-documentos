@@ -65,7 +65,7 @@ class MenuServiceWhatsApp:
                 },
                 "lista_documentos": {
                     "acao": "mostrar_lista_documentos",
-                    "mensagem": "📋 Documentos necessários:\n• RG ou CNH\n• CPF\n• Comprovante de renda\n• Comprovante de residência",
+                    "mensagem": "📋 Documentos necessários:\n• RG ou CNH\n• Comprovante de renda\n• Comprovante de residência\n• Certidão de nascimento/casamento (opcional)",
                     "proximo_passo": "aguardar_decisao"
                 },
                 "concordo_tudo": {

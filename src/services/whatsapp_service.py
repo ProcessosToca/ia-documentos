@@ -1072,6 +1072,16 @@ Não foi possível prosseguir com a coleta automática. Entre em contato diretam
                 if 'mensagem' in resultado:
                     self.enviar_mensagem(remetente, resultado['mensagem'])
                     
+                    # ✅ NOVO: Enviar também para o corretor se for mensagem final de coleta
+                    if resultado.get('coleta_finalizada'):
+                        try:
+                            corretor_telefone = self._obter_corretor_da_sessao(remetente)
+                            if corretor_telefone:
+                                self.enviar_mensagem(corretor_telefone, resultado['mensagem'])
+                                logger.info(f"✅ Mensagem final enviada também para corretor: {corretor_telefone}")
+                        except Exception as e:
+                            logger.warning(f"⚠️ Erro ao enviar mensagem para corretor: {e}")
+                    
                     # NOVO: Capturar mensagem de resposta da IA - CORRIGIDO: usar add_message_enhanced
                     if self.logging_enabled and self.conversation_logger:
                         conv_id = self.conversation_logger.obter_conversa_ativa_por_telefone(remetente)
@@ -1664,6 +1674,7 @@ Vou conectar você com um de nossos atendentes para prosseguir com seu atendimen
                 # Cliente aceita atendimento (SIM)
                 elif resultado_processamento["acao"] == "solicitar_cpf_cliente":
                     self.enviar_mensagem(remetente, "📄 *Para prosseguir, preciso do seu CPF:*\n\n(Somente números, exemplo: 12345678901)")
+                    time.sleep(1.5)  # ✅ Pausa para estabilização
                     logger.info(f"📋 Solicitando CPF para cliente: {remetente}")
                 
                 # Cliente recusa atendimento (NÃO)
@@ -2507,7 +2518,7 @@ Coletamos informações pessoais e documentos que podem incluir:
 • CPF/RG ou outros documentos de identificação
 • Endereço
 • Dados de contato (telefone, e-mail, etc.)
-• Outros dados e documentos necessários para a prestação dos nossos serviços
+• RG ou CNH, comprovantes e outros dados necessários para a prestação dos nossos serviços
 
 **3. Finalidade da Coleta**
 Os dados e documentos coletados via WhatsApp serão utilizados exclusivamente para:

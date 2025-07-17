@@ -25,6 +25,9 @@ class MenuServiceWhatsApp:
             'Authorization': f'Bearer {self.token}'
         }
         
+        # Obter nome da empresa do .env com fallback
+        self.company_name = os.getenv('COMPANY_NAME', 'Locação Online')
+        
         logger.info("📋 MenuServiceWhatsApp inicializado")
 
     def processar_resposta_menu(self, row_id: str, usuario_id: str, webhook_data: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -124,6 +127,18 @@ class MenuServiceWhatsApp:
                     "proximo_passo": "atendimento_cliente_encerrado"
                 },
                 
+                # MENU DE CONFIRMAÇÃO DE ENDEREÇO
+                "confirmar_endereco_sim": {
+                    "acao": "confirmar_endereco",
+                    "mensagem": "✅ Endereço confirmado! Agora preciso do número da residência:",
+                    "proximo_passo": "aguardando_numero"
+                },
+                "confirmar_endereco_nao": {
+                    "acao": "corrigir_endereco",
+                    "mensagem": "❌ Vamos corrigir o endereço. Por favor, digite o CEP novamente:",
+                    "proximo_passo": "aguardando_cep"
+                },
+                
                 # ESPAÇO PARA FUTUROS MENUS
                 # "menu_documentos_xxx": {...},
                 # "menu_status_xxx": {...},
@@ -187,7 +202,7 @@ class MenuServiceWhatsApp:
                 "title": "📋 Concordância - Dados e Documentos",
                 "description": "Para prosseguir com sua locação, precisamos da sua concordância sobre o tratamento de dados pessoais e envio de documentos.",
                 "buttonText": "Ver Opções",
-                "footerText": "Toca Imóveis - Locação Sem Fiador",
+                "footerText": f"{self.company_name} - Locação Sem Fiador",
                 "sections": [
                     {
                         "title": "✅ Concordância Completa",
@@ -286,7 +301,7 @@ class MenuServiceWhatsApp:
                 "title": " Opções de Atendimento",
                 "description": "Como posso ajudar você hoje? Escolha uma das opções abaixo:",
                 "buttonText": "Ver Opções",
-                "footerText": "Toca Imóveis - Locação Sem Fiador",
+                "footerText": f"{self.company_name} - Locação Sem Fiador",
                 "sections": [
                     {
                         "title": "🔧 Atendimento",
@@ -357,7 +372,7 @@ class MenuServiceWhatsApp:
                 "title": f"❓ {titulo}",
                 "description": pergunta,
                 "buttonText": "Responder",
-                "footerText": "Toca Imóveis - Confirmação",
+                "footerText": f"{self.company_name} - Confirmação",
                 "sections": [
                     {
                         "title": "Sua resposta:",
@@ -427,7 +442,7 @@ class MenuServiceWhatsApp:
                 "title": "🏠 Iniciar Atendimento",
                 "description": f"Posso seguir com o Atendimento ao Cliente {cliente_nome}?",
                 "buttonText": "Responder",
-                "footerText": "Toca Imóveis - Fechamento",
+                "footerText": f"{self.company_name} - Fechamento",
                 "sections": [
                     {
                         "title": "Sua decisão:",
@@ -495,9 +510,9 @@ class MenuServiceWhatsApp:
             payload = {
                 "phone": numero_telefone,
                 "title": "🏢 Confirmação de Atendimento",
-                "description": f"O corretor {corretor_nome} da Toca Imóveis está pronto para atendê-lo. Deseja prosseguir?",
-                "buttonText": "Escolher",
-                "footerText": "Toca Imóveis - Locação Sem Fiador",
+                "description": f"O corretor {corretor_nome} da {self.company_name} está pronto para atendê-lo. Deseja prosseguir?",
+                "buttonText": "Selecione uma opção",
+                "footerText": f"{self.company_name} - Locação Sem Fiador",
                 "sections": [
                     {
                         "title": "Opções de Atendimento",
@@ -537,6 +552,75 @@ class MenuServiceWhatsApp:
                 
         except Exception as e:
             logger.error(f"❌ Erro ao enviar menu de confirmação do cliente: {str(e)}")
+            return {
+                "sucesso": False,
+                "erro": str(e),
+                "status_code": 500
+            }
+
+    def enviar_menu_confirmacao_endereco(self, numero_telefone: str, endereco: str) -> Dict[str, Any]:
+        """
+        Envia menu de confirmação de endereço
+        
+        Args:
+            numero_telefone (str): Número do telefone do destinatário
+            endereco (str): Endereço encontrado para confirmar
+            
+        Returns:
+            Dict: Resposta da API
+        """
+        try:
+            url = f"{self.api_host}/v1/message/send-list"
+            
+            params = {
+                "instanceId": self.instance_id
+            }
+            
+            payload = {
+                "phone": numero_telefone,
+                "title": "📍 Confirmação de Endereço",
+                "description": "O endereço encontrado está correto?",
+                "buttonText": "Responder",
+                "footerText": f"{self.company_name} - Locação Sem Fiador",
+                "sections": [
+                    {
+                        "title": "Opções",
+                        "rows": [
+                            {
+                                "title": "✅ Sim, endereço correto",
+                                "description": "Confirmar e prosseguir para número",
+                                "rowId": "confirmar_endereco_sim"
+                            },
+                            {
+                                "title": "❌ Não, endereço incorreto",
+                                "description": "Digitar CEP novamente",
+                                "rowId": "confirmar_endereco_nao"
+                            }
+                        ]
+                    }
+                ],
+                "delayMessage": 1
+            }
+            
+            response = requests.post(url, json=payload, headers=self.headers, params=params)
+            
+            if response.status_code == 200:
+                logger.info(f"✅ Menu de confirmação de endereço enviado para {numero_telefone}")
+                return {
+                    "sucesso": True,
+                    "dados": response.json(),
+                    "status_code": response.status_code
+                }
+            else:
+                logger.error(f"❌ Erro ao enviar menu: {response.status_code}")
+                return {
+                    "sucesso": False,
+                    "erro": response.text,
+                    "status_code": response.status_code
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Erro ao enviar menu de confirmação de endereço: {str(e)}")
             return {
                 "sucesso": False,
                 "erro": str(e),
