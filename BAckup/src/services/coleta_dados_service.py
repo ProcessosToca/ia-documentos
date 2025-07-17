@@ -506,7 +506,9 @@ Digite o complemento ou:
 📅 *Nascimento:* {dados.data_nascimento} ({dados.idade} anos)
 
 🏠 *Endereço:*
-{endereco_completo}"""
+{endereco_completo}
+
+⏰ *Aguarde que vou transferir você para o corretor responsável...*"""
     
     def salvar_cliente_supabase(self, dados: DadosCliente) -> Dict:
         """

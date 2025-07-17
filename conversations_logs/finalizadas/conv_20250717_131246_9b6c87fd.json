@@ -1,0 +1,406 @@
+{
+  "conversation_info": {
+    "id": "conv_20250717_131246_9b6c87fd",
+    "type": "em_andamento",
+    "status": "finalized",
+    "start_time": "2025-07-17T13:12:46.371523",
+    "last_updated": "2025-07-17T13:24:20.294407",
+    "phone_number": "5514997751850",
+    "version": "2.0",
+    "current_phase": "ia_cliente",
+    "business_context": "rental_process",
+    "related_phones": [
+      "5514996960709"
+    ],
+    "end_time": "2025-07-17T13:24:20.294352"
+  },
+  "participants": {
+    "broker": {
+      "type": "broker",
+      "name": "Vinicius Garcia da Silva",
+      "phone": "5514997751850",
+      "cpf": "41615520848",
+      "sector": "Processos"
+    },
+    "client": {
+      "name": "Amadeu Silva Filho",
+      "phone": "5514996960709",
+      "whatsapp_verified": true
+    },
+    "ai": {
+      "name": "IA Toca Imóveis",
+      "version": "1.0",
+      "model": "gpt-4o-mini"
+    }
+  },
+  "conversation_summary": {
+    "total_messages": 7,
+    "ai_messages": 5,
+    "user_messages": 3,
+    "duration_seconds": 0,
+    "classification_changes": [
+      {
+        "timestamp": "2025-07-17T13:14:32.364928",
+        "from_type": "em_andamento",
+        "to_type": "em_andamento",
+        "reason": "menu_selection"
+      },
+      {
+        "timestamp": "2025-07-17T13:16:22.100353",
+        "from_phase": "ia_corretor",
+        "to_phase": "ia_cliente",
+        "reason": "explicit_phase_change",
+        "type": "phase_transition"
+      }
+    ],
+    "phases_count": 2,
+    "specific_interactions": {
+      "ia_corretor": 3,
+      "ia_cliente": 2,
+      "corretor_ia": 3,
+      "cliente_ia": 0
+    },
+    "cleaned_by_ai": true,
+    "original_count": 8,
+    "removed_count": 1
+  },
+  "messages": [
+    {
+      "id": "msg_001",
+      "timestamp": "2025-07-17T13:12:47.782637",
+      "sender": "ia",
+      "content": "Olá Vinicius Garcia da Silva! 👋\n✅ Acesso autorizado como Colaborador da Toca Imóveis\nSetor: Processos",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "corretor",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "corretor",
+      "interaction_type": "ia_corretor",
+      "phase": "ia_corretor",
+      "supabase_synced": true,
+      "supabase_sync_timestamp": "2025-07-17T13:24:27.671962"
+    },
+    {
+      "id": "msg_003",
+      "timestamp": "2025-07-17T13:14:51.690836",
+      "sender": "corretor",
+      "content": "Amadeu Silva Filho",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "corretor",
+      "receiver_specific": "ia",
+      "interaction_type": "corretor_ia",
+      "phase": "ia_corretor",
+      "supabase_synced": true,
+      "supabase_sync_timestamp": "2025-07-17T13:24:27.672007"
+    },
+    {
+      "id": "msg_004",
+      "timestamp": "2025-07-17T13:14:56.977035",
+      "sender": "cliente",
+      "content": "✅ Nome registrado: *Amadeu Silva Filho*\n\n📞 Agora informe o telefone do cliente:\n(Exemplo: 11999999999 ou (11) 99999-9999)",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "corretor",
+        "enhanced_method": true
+      },
+      "sender_specific": "cliente",
+      "receiver_specific": "ia",
+      "interaction_type": "ia_corretor",
+      "phase": "ia_corretor",
+      "receiver": "ia",
+      "ai_auto_classified": true,
+      "supabase_synced": true,
+      "supabase_sync_timestamp": "2025-07-17T13:24:27.672017"
+    },
+    {
+      "id": "msg_005",
+      "timestamp": "2025-07-17T13:15:24.356542",
+      "sender": "cliente",
+      "content": "14996960709",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "cliente",
+      "receiver_specific": "ia",
+      "interaction_type": "corretor_ia",
+      "phase": "ia_corretor",
+      "receiver": "ia",
+      "ai_auto_classified": true,
+      "supabase_synced": true,
+      "supabase_sync_timestamp": "2025-07-17T13:24:27.672023"
+    },
+    {
+      "id": "msg_006",
+      "timestamp": "2025-07-17T13:15:28.769144",
+      "sender": "ia",
+      "content": "✅ *Dados do cliente coletados com sucesso!*\n\n👤 *Nome:* Amadeu Silva Filho\n📞 *Telefone:* (14) 99696-0709",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "corretor",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "corretor",
+      "interaction_type": "ia_corretor",
+      "phase": "ia_corretor",
+      "receiver": "corretor",
+      "ai_reclassified": true,
+      "ai_reclassified_reason": "classificação correta aplicada",
+      "supabase_synced": true,
+      "supabase_sync_timestamp": "2025-07-17T13:24:27.672030"
+    },
+    {
+      "id": "msg_007",
+      "timestamp": "2025-07-17T13:16:22.107619",
+      "sender": "ia",
+      "content": "🏠 *Olá Amadeu Silva Filho!*\n\nSou a Bia, assistente virtual da *Locação Online*.\n\nO corretor *Corretor* solicitou iniciar o processo de *fechamento de locação* com você.\n\nDeseja prosseguir com o atendimento?",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente",
+      "supabase_synced": true,
+      "supabase_sync_timestamp": "2025-07-17T13:24:27.672037"
+    },
+    {
+      "id": "msg_008",
+      "timestamp": "2025-07-17T13:19:42.470053",
+      "sender": "cliente",
+      "content": "Olá! 👋\n\nAqui é a Bia, Corretora de Locação\n\nPara iniciarmos seu atendimento, por favor me envie seu CPF (apenas números).\n\nExemplo: 12345678901",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "cliente",
+      "receiver_specific": "ia",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente",
+      "receiver": "ia",
+      "ai_auto_classified": true,
+      "supabase_synced": true,
+      "supabase_sync_timestamp": "2025-07-17T13:24:27.672042"
+    }
+  ],
+  "conversation_phases": {
+    "current": "ia_cliente",
+    "phases": {
+      "ia_corretor": {
+        "started_at": "2025-07-17T13:12:46.371565",
+        "ended_at": "2025-07-17T13:16:22.100322",
+        "message_count": 6,
+        "classification": "em_andamento",
+        "messages": [
+          {
+            "id": "msg_001",
+            "timestamp": "2025-07-17T13:12:47.782637",
+            "sender": "ia",
+            "content": "Olá Vinicius Garcia da Silva! 👋\n✅ Acesso autorizado como Colaborador da Toca Imóveis\nSetor: Processos",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "corretor",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "corretor",
+            "interaction_type": "ia_corretor",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_002",
+            "timestamp": "2025-07-17T13:14:32.370399",
+            "sender": "corretor",
+            "content": "Menu selecionado: Iniciar Fechamento Locação (row_id: iniciar_fechamento)",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "corretor",
+            "receiver_specific": "ia",
+            "interaction_type": "corretor_ia",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_003",
+            "timestamp": "2025-07-17T13:14:51.690836",
+            "sender": "corretor",
+            "content": "Amadeu Silva Filho",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "corretor",
+            "receiver_specific": "ia",
+            "interaction_type": "corretor_ia",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_004",
+            "timestamp": "2025-07-17T13:14:56.977035",
+            "sender": "ia",
+            "content": "✅ Nome registrado: *Amadeu Silva Filho*\n\n📞 Agora informe o telefone do cliente:\n(Exemplo: 11999999999 ou (11) 99999-9999)",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "corretor",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "corretor",
+            "interaction_type": "ia_corretor",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_005",
+            "timestamp": "2025-07-17T13:15:24.356542",
+            "sender": "corretor",
+            "content": "14996960709",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "corretor",
+            "receiver_specific": "ia",
+            "interaction_type": "corretor_ia",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_006",
+            "timestamp": "2025-07-17T13:15:28.769144",
+            "sender": "ia",
+            "content": "✅ *Dados do cliente coletados com sucesso!*\n\n👤 *Nome:* Amadeu Silva Filho\n📞 *Telefone:* (14) 99696-0709",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "corretor",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "corretor",
+            "interaction_type": "ia_corretor",
+            "phase": "ia_corretor"
+          }
+        ]
+      },
+      "ia_cliente": {
+        "started_at": "2025-07-17T13:16:22.100343",
+        "ended_at": "2025-07-17T13:24:20.294420",
+        "message_count": 2,
+        "classification": "em_andamento",
+        "messages": [
+          {
+            "id": "msg_007",
+            "timestamp": "2025-07-17T13:16:22.107619",
+            "sender": "ia",
+            "content": "🏠 *Olá Amadeu Silva Filho!*\n\nSou a Bia, assistente virtual da *Locação Online*.\n\nO corretor *Corretor* solicitou iniciar o processo de *fechamento de locação* com você.\n\nDeseja prosseguir com o atendimento?",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_008",
+            "timestamp": "2025-07-17T13:19:42.470053",
+            "sender": "ia",
+            "content": "Olá! 👋\n\nAqui é a Bia, Corretora de Locação\n\nPara iniciarmos seu atendimento, por favor me envie seu CPF (apenas números).\n\nExemplo: 12345678901",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          }
+        ]
+      }
+    }
+  },
+  "metadata": {
+    "platform": "whatsapp",
+    "system_version": "2.0",
+    "created_by": "conversation_logger_v2",
+    "improvements": [
+      "specific_classification",
+      "phase_separation",
+      "context_awareness"
+    ],
+    "supabase_ready": true
+  },
+  "ai_cleaning": {
+    "cleaned_at": "2025-07-17T13:24:26.751427",
+    "original_message_count": 8,
+    "cleaned_message_count": 7,
+    "justificativa": "Removido detalhe técnico do menu e reclassificado a mensagem de sucesso de coleta de dados para o corretor. Não há mensagens duplicadas ou perdidas detectadas nesta conversa.",
+    "removed_indices": [
+      1
+    ],
+    "reformatted_count": 1,
+    "inserted_count": 0,
+    "inserted_messages": [],
+    "auditoria": {
+      "timestamp": "2025-07-17T13:24:26.750708",
+      "estatisticas_gerais": {
+        "mensagens_originais": 8,
+        "mensagens_finais": 7,
+        "mensagens_removidas": 1,
+        "taxa_reducao_pct": 12.5
+      },
+      "transformacoes_aplicadas": {
+        "reformatadas": 0,
+        "reclassificadas": 1,
+        "inseridas": 0,
+        "verificacoes_finais": 0,
+        "total_transformacoes": 1
+      },
+      "classificacoes": {
+        "originais": {
+          "ia": 5,
+          "corretor": 3
+        },
+        "finais": {
+          "ia": 3,
+          "corretor": 1,
+          "cliente": 3
+        }
+      },
+      "qualidade_classificacao": {
+        "mensagens_com_cpf": 3,
+        "cpf_classificado_cliente": 3,
+        "taxa_acerto_cpf_pct": 100.0,
+        "mensagens_ia_corretor": 1,
+        "ia_corretor_classificado_correto": 1,
+        "taxa_acerto_ia_corretor_pct": 100.0
+      },
+      "score_qualidade": {
+        "score_geral": 100.0,
+        "status": "EXCELENTE",
+        "confiabilidade": "ALTA"
+      },
+      "openai_analysis": {
+        "justificativa": "Removido detalhe técnico do menu e reclassificado a mensagem de sucesso de coleta de dados para o corretor. Não há mensagens duplicadas ou perdidas detectadas nesta conversa.",
+        "fallback_aplicado": false,
+        "regras_executadas": []
+      }
+    }
+  }
+}

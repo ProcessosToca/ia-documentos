@@ -1,0 +1,1048 @@
+{
+  "conversation_info": {
+    "id": "conv_20250716_180821_bdd41fda",
+    "type": "em_andamento",
+    "status": "active",
+    "start_time": "2025-07-16T18:08:21.329653",
+    "last_updated": "2025-07-17T11:02:26.762053",
+    "phone_number": "5514997751850",
+    "version": "2.0",
+    "current_phase": "ia_cliente",
+    "business_context": "rental_process",
+    "related_phones": [
+      "5514997751850"
+    ]
+  },
+  "participants": {
+    "broker": {
+      "type": "broker",
+      "name": "Vinicius Garcia da Silva",
+      "phone": "5514997751850",
+      "cpf": "41615520848",
+      "sector": "Processos"
+    },
+    "client": {
+      "name": "Vinicius Garcia da Silva",
+      "phone": "5514997751850",
+      "whatsapp_verified": true,
+      "cpf": "07420418837",
+      "email": "vinicius99695@gmail.com",
+      "data_nascimento": "12/02/1996",
+      "idade": 29,
+      "endereco_completo": "Rua Onesimo Camillo Teixeira, Residencial Angelo Sposito - Jardim Marina, Marília/SP",
+      "cep": "17511888",
+      "cidade": "Marília",
+      "uf": "SP",
+      "numero_residencia": "57"
+    },
+    "ai": {
+      "name": "IA Toca Imóveis",
+      "version": "1.0",
+      "model": "gpt-4o-mini"
+    }
+  },
+  "conversation_summary": {
+    "total_messages": 30,
+    "ai_messages": 18,
+    "user_messages": 12,
+    "duration_seconds": 0,
+    "classification_changes": [
+      {
+        "timestamp": "2025-07-16T18:08:34.754079",
+        "from_type": "em_andamento",
+        "to_type": "em_andamento",
+        "reason": "menu_selection"
+      },
+      {
+        "timestamp": "2025-07-16T18:10:33.136024",
+        "from_phase": "ia_corretor",
+        "to_phase": "ia_cliente",
+        "reason": "explicit_phase_change",
+        "type": "phase_transition"
+      },
+      {
+        "timestamp": "2025-07-16T18:10:33.151446",
+        "from_phase": "ia_cliente",
+        "to_phase": "ia_corretor",
+        "reason": "explicit_phase_change",
+        "type": "phase_transition"
+      },
+      {
+        "timestamp": "2025-07-16T18:10:44.839171",
+        "from_phase": "ia_corretor",
+        "to_phase": "ia_cliente",
+        "reason": "explicit_phase_change",
+        "type": "phase_transition"
+      },
+      {
+        "timestamp": "2025-07-16T18:11:31.938198",
+        "from_phase": "ia_cliente",
+        "to_phase": "ia_corretor",
+        "reason": "explicit_phase_change",
+        "type": "phase_transition"
+      },
+      {
+        "timestamp": "2025-07-16T18:11:40.341478",
+        "from_phase": "ia_corretor",
+        "to_phase": "ia_cliente",
+        "reason": "explicit_phase_change",
+        "type": "phase_transition"
+      },
+      {
+        "timestamp": "2025-07-17T11:02:22.522835",
+        "from_phase": "ia_cliente",
+        "to_phase": "ia_corretor",
+        "reason": "explicit_phase_change",
+        "type": "phase_transition"
+      },
+      {
+        "timestamp": "2025-07-17T11:02:26.758944",
+        "from_phase": "ia_corretor",
+        "to_phase": "ia_cliente",
+        "reason": "explicit_phase_change",
+        "type": "phase_transition"
+      }
+    ],
+    "phases_count": 2,
+    "specific_interactions": {
+      "ia_corretor": 4,
+      "ia_cliente": 14,
+      "corretor_ia": 6,
+      "cliente_ia": 6
+    }
+  },
+  "messages": [
+    {
+      "id": "msg_001",
+      "timestamp": "2025-07-16T18:08:22.193954",
+      "sender": "ia",
+      "content": "Olá Vinicius Garcia da Silva! 👋\n✅ Acesso autorizado como Colaborador da Toca Imóveis\nSetor: Processos",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "corretor",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "corretor",
+      "interaction_type": "ia_corretor",
+      "phase": "ia_corretor"
+    },
+    {
+      "id": "msg_002",
+      "timestamp": "2025-07-16T18:08:34.757226",
+      "sender": "corretor",
+      "content": "Menu selecionado: Iniciar Fechamento Locação (row_id: iniciar_fechamento)",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "corretor",
+      "receiver_specific": "ia",
+      "interaction_type": "corretor_ia",
+      "phase": "ia_corretor"
+    },
+    {
+      "id": "msg_003",
+      "timestamp": "2025-07-16T18:09:18.166437",
+      "sender": "corretor",
+      "content": "Vinicius Garcia da Silv",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "corretor",
+      "receiver_specific": "ia",
+      "interaction_type": "corretor_ia",
+      "phase": "ia_corretor"
+    },
+    {
+      "id": "msg_004",
+      "timestamp": "2025-07-16T18:09:22.942439",
+      "sender": "ia",
+      "content": "❌ O nome parece incompleto, pois 'Silv' não é um sobrenome comum ou completo.\n\n💡 Vinicius Garcia da Silva\n\n*Por favor, informe o nome completo do cliente:*",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "corretor",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "corretor",
+      "interaction_type": "ia_corretor",
+      "phase": "ia_corretor"
+    },
+    {
+      "id": "msg_005",
+      "timestamp": "2025-07-16T18:09:37.396488",
+      "sender": "corretor",
+      "content": "Vinicius Garcia da Silva",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "corretor",
+      "receiver_specific": "ia",
+      "interaction_type": "corretor_ia",
+      "phase": "ia_corretor"
+    },
+    {
+      "id": "msg_006",
+      "timestamp": "2025-07-16T18:09:41.150614",
+      "sender": "ia",
+      "content": "✅ Nome registrado: *Vinicius Garcia da Silva*\n\n📞 Agora informe o telefone do cliente:\n(Exemplo: 11999999999 ou (11) 99999-9999)",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "corretor",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "corretor",
+      "interaction_type": "ia_corretor",
+      "phase": "ia_corretor"
+    },
+    {
+      "id": "msg_007",
+      "timestamp": "2025-07-16T18:10:29.976873",
+      "sender": "corretor",
+      "content": "14997751850",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "corretor",
+      "receiver_specific": "ia",
+      "interaction_type": "corretor_ia",
+      "phase": "ia_corretor"
+    },
+    {
+      "id": "msg_008",
+      "timestamp": "2025-07-16T18:10:33.142947",
+      "sender": "ia",
+      "content": "✅ *Dados do cliente coletados com sucesso!*\n\n👤 *Nome:* Vinicius Garcia da Silva\n📞 *Telefone:* (14) 99775-1850",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_009",
+      "timestamp": "2025-07-16T18:10:33.156277",
+      "sender": "ia",
+      "content": "✅ *Dados do cliente coletados com sucesso!*\n\n👤 *Nome:* Vinicius Garcia da Silva\n📞 *Telefone:* (14) 99775-1850",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "corretor",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "corretor",
+      "interaction_type": "ia_corretor",
+      "phase": "ia_corretor"
+    },
+    {
+      "id": "msg_010",
+      "timestamp": "2025-07-16T18:10:44.844548",
+      "sender": "ia",
+      "content": "🏠 *Olá Vinicius Garcia da Silva!*\n\nSou a Bia, assistente virtual da *Locação Online*.\n\nO corretor *Corretor* solicitou iniciar o processo de *fechamento de locação* com você.\n\nDeseja prosseguir com o atendimento?",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_011",
+      "timestamp": "2025-07-16T18:10:49.562048",
+      "sender": "ia",
+      "content": "✅ *Contato iniciado com sucesso!*\n\n👤 *Cliente:* Vinicius Garcia da Silva\n📞 *WhatsApp:* (14) 99775-1850\n\n🚀 *Mensagem enviada ao cliente aguardando resposta...*\n\n📋 *Status:* Aguardando confirmação do cliente",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_012",
+      "timestamp": "2025-07-16T18:11:07.314951",
+      "sender": "ia",
+      "content": "✅ Perfeito! Para prosseguir, preciso do seu CPF.",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_013",
+      "timestamp": "2025-07-16T18:11:08.137956",
+      "sender": "ia",
+      "content": "📄 *Para prosseguir, preciso do seu CPF:*\n\n(Somente números, exemplo: 12345678901)",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_014",
+      "timestamp": "2025-07-16T18:11:31.943114",
+      "sender": "corretor",
+      "content": "074.204.188-37",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "corretor",
+      "receiver_specific": "ia",
+      "interaction_type": "corretor_ia",
+      "phase": "ia_corretor"
+    },
+    {
+      "id": "msg_015",
+      "timestamp": "2025-07-16T18:11:40.347930",
+      "sender": "ia",
+      "content": "📧 *Digite seu e-mail:*\n\nExemplo: seuemail@gmail.com",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_016",
+      "timestamp": "2025-07-16T18:12:02.033002",
+      "sender": "cliente",
+      "content": "Vinicius99695@gmail.com",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "cliente",
+      "receiver_specific": "ia",
+      "interaction_type": "cliente_ia",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_017",
+      "timestamp": "2025-07-16T18:12:03.829085",
+      "sender": "ia",
+      "content": "✅ *E-mail confirmado:* vinicius99695@gmail.com\n\n📅 *Agora digite sua data de nascimento:*\n\nFormato: DD/MM/AAAA\nExemplo: 15/03/1990",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_018",
+      "timestamp": "2025-07-16T18:12:19.701156",
+      "sender": "cliente",
+      "content": "12/02/1996",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "cliente",
+      "receiver_specific": "ia",
+      "interaction_type": "cliente_ia",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_019",
+      "timestamp": "2025-07-16T18:12:21.416571",
+      "sender": "ia",
+      "content": "✅ *Data confirmada:* 12/02/1996 (29 anos)\n\n🏠 *Agora digite seu CEP:*\n\nFormato: apenas números\nExemplo: 18035310",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_020",
+      "timestamp": "2025-07-16T18:12:30.953322",
+      "sender": "cliente",
+      "content": "17511888",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "cliente",
+      "receiver_specific": "ia",
+      "interaction_type": "cliente_ia",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_021",
+      "timestamp": "2025-07-16T18:12:33.273699",
+      "sender": "ia",
+      "content": "✅ *Endereço encontrado:*\n\n📍 *Rua Onesimo Camillo Teixeira, Residencial Angelo Sposito - Jardim Marina, Marília/SP*\n🔢 *CEP:* 17511888\n\nEste endereço está correto?\n\nDigite:\n✅ *SIM* - para confirmar\n❌ *NÃO* - para informar o endereço correto",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_022",
+      "timestamp": "2025-07-16T18:12:41.490193",
+      "sender": "cliente",
+      "content": "Sim",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "cliente",
+      "receiver_specific": "ia",
+      "interaction_type": "cliente_ia",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_023",
+      "timestamp": "2025-07-16T18:12:43.164124",
+      "sender": "ia",
+      "content": "✅ *Endereço confirmado!*\n\n🏠 *Rua Onesimo Camillo Teixeira, Residencial Angelo Sposito - Jardim Marina, Marília/SP*\n\n🔢 *Agora digite o número da sua residência:*\n\nExemplo: 123, 45A, S/N",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_024",
+      "timestamp": "2025-07-16T18:12:51.153625",
+      "sender": "cliente",
+      "content": "57",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "cliente",
+      "receiver_specific": "ia",
+      "interaction_type": "cliente_ia",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_025",
+      "timestamp": "2025-07-16T18:12:52.843091",
+      "sender": "ia",
+      "content": "🏢 *Tem complemento? (apartamento, bloco, etc.)*\n\nDigite o complemento ou:\n➡️ *PULAR* - se não tem complemento",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_026",
+      "timestamp": "2025-07-16T18:12:59.274991",
+      "sender": "cliente",
+      "content": "Pular",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "cliente",
+      "receiver_specific": "ia",
+      "interaction_type": "cliente_ia",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_027",
+      "timestamp": "2025-07-16T18:13:11.334027",
+      "sender": "ia",
+      "content": "✅ Dados coletados com sucesso!\n\n👤 *Cliente:* Vinicius Garcia da Silva\n📱 *Telefone:* 5514997751850\n🆔 *CPF:* 074***37\n📧 *E-mail:* vinicius99695@gmail.com\n📅 *Nascimento:* 12/02/1996 (29 anos)\n\n🏠 *Endereço:*\nRua Onesimo Camillo Teixeira, 57\nResidencial Angelo Sposito - Jardim Marina, Marília/SP\nCEP: 17511-888",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_028",
+      "timestamp": "2025-07-16T18:13:11.368381",
+      "sender": "ia",
+      "content": "✅ Dados coletados com sucesso!\n\n👤 *Cliente:* Vinicius Garcia da Silva\n📱 *Telefone:* 5514997751850\n🆔 *CPF:* 074***37\n📧 *E-mail:* vinicius99695@gmail.com\n📅 *Nascimento:* 12/02/1996 (29 anos)\n\n🏠 *Endereço:*\nRua Onesimo Camillo Teixeira, 57\nResidencial Angelo Sposito - Jardim Marina, Marília/SP\nCEP: 17511-888",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_029",
+      "timestamp": "2025-07-17T11:02:22.568404",
+      "sender": "corretor",
+      "content": "Bom Dia",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "corretor",
+      "receiver_specific": "ia",
+      "interaction_type": "corretor_ia",
+      "phase": "ia_corretor"
+    },
+    {
+      "id": "msg_030",
+      "timestamp": "2025-07-17T11:02:26.762036",
+      "sender": "ia",
+      "content": "Olá! 👋\n\nAqui é a Bia, Corretora de Locação\n\nPara iniciarmos seu atendimento, por favor me envie seu CPF (apenas números).\n\nExemplo: 12345678901",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    }
+  ],
+  "conversation_phases": {
+    "current": "ia_cliente",
+    "phases": {
+      "ia_corretor": {
+        "started_at": "2025-07-16T18:08:21.329677",
+        "ended_at": "2025-07-17T11:02:26.758937",
+        "message_count": 10,
+        "classification": "em_andamento",
+        "messages": [
+          {
+            "id": "msg_001",
+            "timestamp": "2025-07-16T18:08:22.193954",
+            "sender": "ia",
+            "content": "Olá Vinicius Garcia da Silva! 👋\n✅ Acesso autorizado como Colaborador da Toca Imóveis\nSetor: Processos",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "corretor",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "corretor",
+            "interaction_type": "ia_corretor",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_002",
+            "timestamp": "2025-07-16T18:08:34.757226",
+            "sender": "corretor",
+            "content": "Menu selecionado: Iniciar Fechamento Locação (row_id: iniciar_fechamento)",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "corretor",
+            "receiver_specific": "ia",
+            "interaction_type": "corretor_ia",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_003",
+            "timestamp": "2025-07-16T18:09:18.166437",
+            "sender": "corretor",
+            "content": "Vinicius Garcia da Silv",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "corretor",
+            "receiver_specific": "ia",
+            "interaction_type": "corretor_ia",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_004",
+            "timestamp": "2025-07-16T18:09:22.942439",
+            "sender": "ia",
+            "content": "❌ O nome parece incompleto, pois 'Silv' não é um sobrenome comum ou completo.\n\n💡 Vinicius Garcia da Silva\n\n*Por favor, informe o nome completo do cliente:*",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "corretor",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "corretor",
+            "interaction_type": "ia_corretor",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_005",
+            "timestamp": "2025-07-16T18:09:37.396488",
+            "sender": "corretor",
+            "content": "Vinicius Garcia da Silva",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "corretor",
+            "receiver_specific": "ia",
+            "interaction_type": "corretor_ia",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_006",
+            "timestamp": "2025-07-16T18:09:41.150614",
+            "sender": "ia",
+            "content": "✅ Nome registrado: *Vinicius Garcia da Silva*\n\n📞 Agora informe o telefone do cliente:\n(Exemplo: 11999999999 ou (11) 99999-9999)",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "corretor",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "corretor",
+            "interaction_type": "ia_corretor",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_007",
+            "timestamp": "2025-07-16T18:10:29.976873",
+            "sender": "corretor",
+            "content": "14997751850",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "corretor",
+            "receiver_specific": "ia",
+            "interaction_type": "corretor_ia",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_009",
+            "timestamp": "2025-07-16T18:10:33.156277",
+            "sender": "ia",
+            "content": "✅ *Dados do cliente coletados com sucesso!*\n\n👤 *Nome:* Vinicius Garcia da Silva\n📞 *Telefone:* (14) 99775-1850",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "corretor",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "corretor",
+            "interaction_type": "ia_corretor",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_014",
+            "timestamp": "2025-07-16T18:11:31.943114",
+            "sender": "corretor",
+            "content": "074.204.188-37",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "corretor",
+            "receiver_specific": "ia",
+            "interaction_type": "corretor_ia",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_029",
+            "timestamp": "2025-07-17T11:02:22.568404",
+            "sender": "corretor",
+            "content": "Bom Dia",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "corretor",
+            "receiver_specific": "ia",
+            "interaction_type": "corretor_ia",
+            "phase": "ia_corretor"
+          }
+        ]
+      },
+      "ia_cliente": {
+        "started_at": "2025-07-16T18:10:33.136019",
+        "ended_at": "2025-07-17T11:02:22.522684",
+        "message_count": 20,
+        "classification": "em_andamento",
+        "messages": [
+          {
+            "id": "msg_008",
+            "timestamp": "2025-07-16T18:10:33.142947",
+            "sender": "ia",
+            "content": "✅ *Dados do cliente coletados com sucesso!*\n\n👤 *Nome:* Vinicius Garcia da Silva\n📞 *Telefone:* (14) 99775-1850",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_010",
+            "timestamp": "2025-07-16T18:10:44.844548",
+            "sender": "ia",
+            "content": "🏠 *Olá Vinicius Garcia da Silva!*\n\nSou a Bia, assistente virtual da *Locação Online*.\n\nO corretor *Corretor* solicitou iniciar o processo de *fechamento de locação* com você.\n\nDeseja prosseguir com o atendimento?",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_011",
+            "timestamp": "2025-07-16T18:10:49.562048",
+            "sender": "ia",
+            "content": "✅ *Contato iniciado com sucesso!*\n\n👤 *Cliente:* Vinicius Garcia da Silva\n📞 *WhatsApp:* (14) 99775-1850\n\n🚀 *Mensagem enviada ao cliente aguardando resposta...*\n\n📋 *Status:* Aguardando confirmação do cliente",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_012",
+            "timestamp": "2025-07-16T18:11:07.314951",
+            "sender": "ia",
+            "content": "✅ Perfeito! Para prosseguir, preciso do seu CPF.",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_013",
+            "timestamp": "2025-07-16T18:11:08.137956",
+            "sender": "ia",
+            "content": "📄 *Para prosseguir, preciso do seu CPF:*\n\n(Somente números, exemplo: 12345678901)",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_015",
+            "timestamp": "2025-07-16T18:11:40.347930",
+            "sender": "ia",
+            "content": "📧 *Digite seu e-mail:*\n\nExemplo: seuemail@gmail.com",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_016",
+            "timestamp": "2025-07-16T18:12:02.033002",
+            "sender": "cliente",
+            "content": "Vinicius99695@gmail.com",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "cliente",
+            "receiver_specific": "ia",
+            "interaction_type": "cliente_ia",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_017",
+            "timestamp": "2025-07-16T18:12:03.829085",
+            "sender": "ia",
+            "content": "✅ *E-mail confirmado:* vinicius99695@gmail.com\n\n📅 *Agora digite sua data de nascimento:*\n\nFormato: DD/MM/AAAA\nExemplo: 15/03/1990",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_018",
+            "timestamp": "2025-07-16T18:12:19.701156",
+            "sender": "cliente",
+            "content": "12/02/1996",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "cliente",
+            "receiver_specific": "ia",
+            "interaction_type": "cliente_ia",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_019",
+            "timestamp": "2025-07-16T18:12:21.416571",
+            "sender": "ia",
+            "content": "✅ *Data confirmada:* 12/02/1996 (29 anos)\n\n🏠 *Agora digite seu CEP:*\n\nFormato: apenas números\nExemplo: 18035310",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_020",
+            "timestamp": "2025-07-16T18:12:30.953322",
+            "sender": "cliente",
+            "content": "17511888",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "cliente",
+            "receiver_specific": "ia",
+            "interaction_type": "cliente_ia",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_021",
+            "timestamp": "2025-07-16T18:12:33.273699",
+            "sender": "ia",
+            "content": "✅ *Endereço encontrado:*\n\n📍 *Rua Onesimo Camillo Teixeira, Residencial Angelo Sposito - Jardim Marina, Marília/SP*\n🔢 *CEP:* 17511888\n\nEste endereço está correto?\n\nDigite:\n✅ *SIM* - para confirmar\n❌ *NÃO* - para informar o endereço correto",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_022",
+            "timestamp": "2025-07-16T18:12:41.490193",
+            "sender": "cliente",
+            "content": "Sim",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "cliente",
+            "receiver_specific": "ia",
+            "interaction_type": "cliente_ia",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_023",
+            "timestamp": "2025-07-16T18:12:43.164124",
+            "sender": "ia",
+            "content": "✅ *Endereço confirmado!*\n\n🏠 *Rua Onesimo Camillo Teixeira, Residencial Angelo Sposito - Jardim Marina, Marília/SP*\n\n🔢 *Agora digite o número da sua residência:*\n\nExemplo: 123, 45A, S/N",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_024",
+            "timestamp": "2025-07-16T18:12:51.153625",
+            "sender": "cliente",
+            "content": "57",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "cliente",
+            "receiver_specific": "ia",
+            "interaction_type": "cliente_ia",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_025",
+            "timestamp": "2025-07-16T18:12:52.843091",
+            "sender": "ia",
+            "content": "🏢 *Tem complemento? (apartamento, bloco, etc.)*\n\nDigite o complemento ou:\n➡️ *PULAR* - se não tem complemento",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_026",
+            "timestamp": "2025-07-16T18:12:59.274991",
+            "sender": "cliente",
+            "content": "Pular",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "cliente",
+            "receiver_specific": "ia",
+            "interaction_type": "cliente_ia",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_027",
+            "timestamp": "2025-07-16T18:13:11.334027",
+            "sender": "ia",
+            "content": "✅ Dados coletados com sucesso!\n\n👤 *Cliente:* Vinicius Garcia da Silva\n📱 *Telefone:* 5514997751850\n🆔 *CPF:* 074***37\n📧 *E-mail:* vinicius99695@gmail.com\n📅 *Nascimento:* 12/02/1996 (29 anos)\n\n🏠 *Endereço:*\nRua Onesimo Camillo Teixeira, 57\nResidencial Angelo Sposito - Jardim Marina, Marília/SP\nCEP: 17511-888",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_028",
+            "timestamp": "2025-07-16T18:13:11.368381",
+            "sender": "ia",
+            "content": "✅ Dados coletados com sucesso!\n\n👤 *Cliente:* Vinicius Garcia da Silva\n📱 *Telefone:* 5514997751850\n🆔 *CPF:* 074***37\n📧 *E-mail:* vinicius99695@gmail.com\n📅 *Nascimento:* 12/02/1996 (29 anos)\n\n🏠 *Endereço:*\nRua Onesimo Camillo Teixeira, 57\nResidencial Angelo Sposito - Jardim Marina, Marília/SP\nCEP: 17511-888",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_030",
+            "timestamp": "2025-07-17T11:02:26.762036",
+            "sender": "ia",
+            "content": "Olá! 👋\n\nAqui é a Bia, Corretora de Locação\n\nPara iniciarmos seu atendimento, por favor me envie seu CPF (apenas números).\n\nExemplo: 12345678901",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          }
+        ]
+      }
+    }
+  },
+  "metadata": {
+    "platform": "whatsapp",
+    "system_version": "2.0",
+    "created_by": "conversation_logger_v2",
+    "improvements": [
+      "specific_classification",
+      "phase_separation",
+      "context_awareness"
+    ],
+    "supabase_ready": true
+  }
+}
