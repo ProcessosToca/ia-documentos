@@ -1157,6 +1157,16 @@ Não foi possível prosseguir com a coleta automática. Entre em contato diretam
                         for erro in erros:
                             logger.error(f"❌ Erro {erro['tipo']}: {erro['erro']}")
                     
+                    # Enviar menu de confirmação de documentos (se salvamento foi bem-sucedido)
+                    if cliente_salvo and negociacao_criada:
+                        try:
+                            logger.info(f"📄 Enviando menu de confirmação de documentos para: {remetente}")
+                            self.menu_service.enviar_menu_confirmacao_documentos(remetente)
+                            logger.info(f"✅ Menu de documentos enviado com sucesso para: {remetente}")
+                        except Exception as e:
+                            logger.warning(f"⚠️ Erro ao enviar menu de documentos: {e}")
+                            # Não falhar o processo se menu falhar
+                    
                     # Limpar sessão de coleta
                     self.coleta_dados_service.limpar_sessao(remetente)
                     

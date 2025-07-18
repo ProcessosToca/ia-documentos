@@ -1,0 +1,646 @@
+{
+  "conversation_info": {
+    "id": "conv_20250718_163929_f35c6fa0",
+    "type": "em_andamento",
+    "status": "active",
+    "start_time": "2025-07-18T16:39:29.352206",
+    "last_updated": "2025-07-18T16:43:56.954043",
+    "phone_number": "5514997751850",
+    "version": "2.0",
+    "current_phase": "ia_cliente",
+    "business_context": "rental_process",
+    "related_phones": [
+      "5514996960709"
+    ]
+  },
+  "participants": {
+    "broker": {
+      "type": "broker",
+      "name": "Vinicius Garcia da Silva",
+      "phone": "5514997751850",
+      "cpf": "41615520848",
+      "sector": "Processos"
+    },
+    "client": {
+      "name": "Amaeu Silva Filho",
+      "phone": "5514996960709",
+      "whatsapp_verified": true,
+      "cpf": "07420418837",
+      "email": "teste@gmail.com",
+      "data_nascimento": "07/09/1964",
+      "idade": 60,
+      "endereco_completo": "Rua Theophilo Miguel, Jardim Ipanema, Marília/SP",
+      "cep": "17511685",
+      "cidade": "Marília",
+      "uf": "SP",
+      "numero_residencia": "300"
+    },
+    "ai": {
+      "name": "IA Toca Imóveis",
+      "version": "1.0",
+      "model": "gpt-4o-mini"
+    }
+  },
+  "conversation_summary": {
+    "total_messages": 18,
+    "ai_messages": 15,
+    "user_messages": 3,
+    "duration_seconds": 0,
+    "classification_changes": [
+      {
+        "timestamp": "2025-07-18T16:40:00.599242",
+        "from_type": "em_andamento",
+        "to_type": "em_andamento",
+        "reason": "menu_selection"
+      },
+      {
+        "timestamp": "2025-07-18T16:41:35.766840",
+        "from_phase": "ia_corretor",
+        "to_phase": "ia_cliente",
+        "reason": "explicit_phase_change",
+        "type": "phase_transition"
+      }
+    ],
+    "phases_count": 2,
+    "specific_interactions": {
+      "ia_corretor": 3,
+      "ia_cliente": 12,
+      "corretor_ia": 3,
+      "cliente_ia": 0
+    }
+  },
+  "messages": [
+    {
+      "id": "msg_001",
+      "timestamp": "2025-07-18T16:39:30.780278",
+      "sender": "ia",
+      "content": "Olá Vinicius Garcia da Silva! 👋\n✅ Acesso autorizado como Colaborador da Toca Imóveis\nSetor: Processos",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "corretor",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "corretor",
+      "interaction_type": "ia_corretor",
+      "phase": "ia_corretor"
+    },
+    {
+      "id": "msg_002",
+      "timestamp": "2025-07-18T16:40:00.604780",
+      "sender": "corretor",
+      "content": "Menu selecionado: Iniciar Fechamento Locação (row_id: iniciar_fechamento)",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "corretor",
+      "receiver_specific": "ia",
+      "interaction_type": "corretor_ia",
+      "phase": "ia_corretor"
+    },
+    {
+      "id": "msg_003",
+      "timestamp": "2025-07-18T16:40:11.447940",
+      "sender": "corretor",
+      "content": "Amaeu Silva Filho",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "corretor",
+      "receiver_specific": "ia",
+      "interaction_type": "corretor_ia",
+      "phase": "ia_corretor"
+    },
+    {
+      "id": "msg_004",
+      "timestamp": "2025-07-18T16:40:16.875457",
+      "sender": "ia",
+      "content": "✅ Nome registrado: *Amaeu Silva Filho*\n\n📞 Agora informe o telefone do cliente:\n(Exemplo: 11999999999 ou (11) 99999-9999)",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "corretor",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "corretor",
+      "interaction_type": "ia_corretor",
+      "phase": "ia_corretor"
+    },
+    {
+      "id": "msg_005",
+      "timestamp": "2025-07-18T16:41:15.505365",
+      "sender": "corretor",
+      "content": "14996960709",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "ia",
+        "enhanced_method": true
+      },
+      "sender_specific": "corretor",
+      "receiver_specific": "ia",
+      "interaction_type": "corretor_ia",
+      "phase": "ia_corretor"
+    },
+    {
+      "id": "msg_006",
+      "timestamp": "2025-07-18T16:41:23.816752",
+      "sender": "ia",
+      "content": "✅ *Dados do cliente coletados com sucesso!*\n\n👤 *Nome:* Amaeu Silva Filho\n📞 *Telefone:* (14) 99696-0709",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "corretor",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "corretor",
+      "interaction_type": "ia_corretor",
+      "phase": "ia_corretor"
+    },
+    {
+      "id": "msg_007",
+      "timestamp": "2025-07-18T16:41:35.774930",
+      "sender": "ia",
+      "content": "🏠 *Olá Amaeu Silva Filho!*\n\nSou a Bia, assistente virtual da *Locação Online*.\n\nO corretor *Corretor* solicitou iniciar o processo de *fechamento de locação* com você.\n\nDeseja prosseguir com o atendimento?",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_008",
+      "timestamp": "2025-07-18T16:41:47.203768",
+      "sender": "ia",
+      "content": "✅ Perfeito! Para prosseguir, preciso do seu CPF.",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_009",
+      "timestamp": "2025-07-18T16:41:48.246105",
+      "sender": "ia",
+      "content": "📄 *Para prosseguir, preciso do seu CPF:*\n\n(Somente números, exemplo: 12345678901)",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_010",
+      "timestamp": "2025-07-18T16:42:14.035608",
+      "sender": "ia",
+      "content": "📧 *Digite seu e-mail:*\n\nExemplo: seuemail@gmail.com",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_011",
+      "timestamp": "2025-07-18T16:42:33.716790",
+      "sender": "ia",
+      "content": "✅ *E-mail confirmado:* teste@gmail.com\n\n📅 *Agora digite sua data de nascimento:*\n\nFormato: DD/MM/AAAA\nExemplo: 15/03/1990",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_012",
+      "timestamp": "2025-07-18T16:42:49.325245",
+      "sender": "ia",
+      "content": "✅ *Data confirmada:* 07/09/1964 (60 anos)\n\n🏠 *Agora digite seu CEP:*\n\nFormato: apenas números\nExemplo: 18035310",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_013",
+      "timestamp": "2025-07-18T16:43:03.218835",
+      "sender": "ia",
+      "content": "✅ *Endereço encontrado:*\n\n📍 *Rua Theophilo Miguel, Jardim Ipanema, Marília/SP*\n🔢 *CEP:* 17511685",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_014",
+      "timestamp": "2025-07-18T16:43:13.368567",
+      "sender": "ia",
+      "content": "✅ *Endereço confirmado!*\n\n🏠 *Rua Theophilo Miguel, Jardim Ipanema, Marília/SP*\n\n🔢 *Agora digite o número da sua residência:*\n\nExemplo: 123, 45A, S/N",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_015",
+      "timestamp": "2025-07-18T16:43:28.793668",
+      "sender": "ia",
+      "content": "🏢 *Tem complemento? (apartamento, bloco, etc.)*\n\nDigite o complemento ou:\n➡️ *PULAR* - se não tem complemento",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_016",
+      "timestamp": "2025-07-18T16:43:47.118344",
+      "sender": "ia",
+      "content": "✅ Dados coletados com sucesso!\n\n👤 *Cliente:* Amaeu Silva Filho\n📱 *Telefone:* 5514996960709\n🆔 *CPF:* 074***37\n📧 *E-mail:* teste@gmail.com\n📅 *Nascimento:* 07/09/1964 (60 anos)\n\n🏠 *Endereço:*\nRua Theophilo Miguel, 300\nJardim Ipanema, Marília/SP\nCEP: 17511-685",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_017",
+      "timestamp": "2025-07-18T16:43:47.985762",
+      "sender": "ia",
+      "content": "✅ Dados coletados com sucesso!\n\n👤 *Cliente:* Amaeu Silva Filho\n📱 *Telefone:* 5514996960709\n🆔 *CPF:* 074***37\n📧 *E-mail:* teste@gmail.com\n📅 *Nascimento:* 07/09/1964 (60 anos)\n\n🏠 *Endereço:*\nRua Theophilo Miguel, 300\nJardim Ipanema, Marília/SP\nCEP: 17511-685",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    },
+    {
+      "id": "msg_018",
+      "timestamp": "2025-07-18T16:43:56.954012",
+      "sender": "ia",
+      "content": "✅ Perfeito! Vamos começar a coleta de documentos. Me peça para enviar documentos que inicio a sequência de envios com você! 📄",
+      "message_type": "text",
+      "metadata": {
+        "receiver_explicit": "cliente",
+        "enhanced_method": true
+      },
+      "sender_specific": "ia",
+      "receiver_specific": "cliente",
+      "interaction_type": "ia_cliente",
+      "phase": "ia_cliente"
+    }
+  ],
+  "conversation_phases": {
+    "current": "ia_cliente",
+    "phases": {
+      "ia_corretor": {
+        "started_at": "2025-07-18T16:39:29.352230",
+        "ended_at": "2025-07-18T16:41:35.766811",
+        "message_count": 6,
+        "classification": "em_andamento",
+        "messages": [
+          {
+            "id": "msg_001",
+            "timestamp": "2025-07-18T16:39:30.780278",
+            "sender": "ia",
+            "content": "Olá Vinicius Garcia da Silva! 👋\n✅ Acesso autorizado como Colaborador da Toca Imóveis\nSetor: Processos",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "corretor",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "corretor",
+            "interaction_type": "ia_corretor",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_002",
+            "timestamp": "2025-07-18T16:40:00.604780",
+            "sender": "corretor",
+            "content": "Menu selecionado: Iniciar Fechamento Locação (row_id: iniciar_fechamento)",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "corretor",
+            "receiver_specific": "ia",
+            "interaction_type": "corretor_ia",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_003",
+            "timestamp": "2025-07-18T16:40:11.447940",
+            "sender": "corretor",
+            "content": "Amaeu Silva Filho",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "corretor",
+            "receiver_specific": "ia",
+            "interaction_type": "corretor_ia",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_004",
+            "timestamp": "2025-07-18T16:40:16.875457",
+            "sender": "ia",
+            "content": "✅ Nome registrado: *Amaeu Silva Filho*\n\n📞 Agora informe o telefone do cliente:\n(Exemplo: 11999999999 ou (11) 99999-9999)",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "corretor",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "corretor",
+            "interaction_type": "ia_corretor",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_005",
+            "timestamp": "2025-07-18T16:41:15.505365",
+            "sender": "corretor",
+            "content": "14996960709",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "ia",
+              "enhanced_method": true
+            },
+            "sender_specific": "corretor",
+            "receiver_specific": "ia",
+            "interaction_type": "corretor_ia",
+            "phase": "ia_corretor"
+          },
+          {
+            "id": "msg_006",
+            "timestamp": "2025-07-18T16:41:23.816752",
+            "sender": "ia",
+            "content": "✅ *Dados do cliente coletados com sucesso!*\n\n👤 *Nome:* Amaeu Silva Filho\n📞 *Telefone:* (14) 99696-0709",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "corretor",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "corretor",
+            "interaction_type": "ia_corretor",
+            "phase": "ia_corretor"
+          }
+        ]
+      },
+      "ia_cliente": {
+        "started_at": "2025-07-18T16:41:35.766829",
+        "ended_at": null,
+        "message_count": 12,
+        "classification": "em_andamento",
+        "messages": [
+          {
+            "id": "msg_007",
+            "timestamp": "2025-07-18T16:41:35.774930",
+            "sender": "ia",
+            "content": "🏠 *Olá Amaeu Silva Filho!*\n\nSou a Bia, assistente virtual da *Locação Online*.\n\nO corretor *Corretor* solicitou iniciar o processo de *fechamento de locação* com você.\n\nDeseja prosseguir com o atendimento?",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_008",
+            "timestamp": "2025-07-18T16:41:47.203768",
+            "sender": "ia",
+            "content": "✅ Perfeito! Para prosseguir, preciso do seu CPF.",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_009",
+            "timestamp": "2025-07-18T16:41:48.246105",
+            "sender": "ia",
+            "content": "📄 *Para prosseguir, preciso do seu CPF:*\n\n(Somente números, exemplo: 12345678901)",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_010",
+            "timestamp": "2025-07-18T16:42:14.035608",
+            "sender": "ia",
+            "content": "📧 *Digite seu e-mail:*\n\nExemplo: seuemail@gmail.com",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_011",
+            "timestamp": "2025-07-18T16:42:33.716790",
+            "sender": "ia",
+            "content": "✅ *E-mail confirmado:* teste@gmail.com\n\n📅 *Agora digite sua data de nascimento:*\n\nFormato: DD/MM/AAAA\nExemplo: 15/03/1990",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_012",
+            "timestamp": "2025-07-18T16:42:49.325245",
+            "sender": "ia",
+            "content": "✅ *Data confirmada:* 07/09/1964 (60 anos)\n\n🏠 *Agora digite seu CEP:*\n\nFormato: apenas números\nExemplo: 18035310",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_013",
+            "timestamp": "2025-07-18T16:43:03.218835",
+            "sender": "ia",
+            "content": "✅ *Endereço encontrado:*\n\n📍 *Rua Theophilo Miguel, Jardim Ipanema, Marília/SP*\n🔢 *CEP:* 17511685",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_014",
+            "timestamp": "2025-07-18T16:43:13.368567",
+            "sender": "ia",
+            "content": "✅ *Endereço confirmado!*\n\n🏠 *Rua Theophilo Miguel, Jardim Ipanema, Marília/SP*\n\n🔢 *Agora digite o número da sua residência:*\n\nExemplo: 123, 45A, S/N",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_015",
+            "timestamp": "2025-07-18T16:43:28.793668",
+            "sender": "ia",
+            "content": "🏢 *Tem complemento? (apartamento, bloco, etc.)*\n\nDigite o complemento ou:\n➡️ *PULAR* - se não tem complemento",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_016",
+            "timestamp": "2025-07-18T16:43:47.118344",
+            "sender": "ia",
+            "content": "✅ Dados coletados com sucesso!\n\n👤 *Cliente:* Amaeu Silva Filho\n📱 *Telefone:* 5514996960709\n🆔 *CPF:* 074***37\n📧 *E-mail:* teste@gmail.com\n📅 *Nascimento:* 07/09/1964 (60 anos)\n\n🏠 *Endereço:*\nRua Theophilo Miguel, 300\nJardim Ipanema, Marília/SP\nCEP: 17511-685",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_017",
+            "timestamp": "2025-07-18T16:43:47.985762",
+            "sender": "ia",
+            "content": "✅ Dados coletados com sucesso!\n\n👤 *Cliente:* Amaeu Silva Filho\n📱 *Telefone:* 5514996960709\n🆔 *CPF:* 074***37\n📧 *E-mail:* teste@gmail.com\n📅 *Nascimento:* 07/09/1964 (60 anos)\n\n🏠 *Endereço:*\nRua Theophilo Miguel, 300\nJardim Ipanema, Marília/SP\nCEP: 17511-685",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          },
+          {
+            "id": "msg_018",
+            "timestamp": "2025-07-18T16:43:56.954012",
+            "sender": "ia",
+            "content": "✅ Perfeito! Vamos começar a coleta de documentos. Me peça para enviar documentos que inicio a sequência de envios com você! 📄",
+            "message_type": "text",
+            "metadata": {
+              "receiver_explicit": "cliente",
+              "enhanced_method": true
+            },
+            "sender_specific": "ia",
+            "receiver_specific": "cliente",
+            "interaction_type": "ia_cliente",
+            "phase": "ia_cliente"
+          }
+        ]
+      }
+    }
+  },
+  "metadata": {
+    "platform": "whatsapp",
+    "system_version": "2.0",
+    "created_by": "conversation_logger_v2",
+    "improvements": [
+      "specific_classification",
+      "phase_separation",
+      "context_awareness"
+    ],
+    "supabase_ready": true
+  }
+}
