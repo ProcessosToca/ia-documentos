@@ -139,6 +139,18 @@ class MenuServiceWhatsApp:
                     "proximo_passo": "aguardando_cep"
                 },
                 
+                # MENU DE CONFIRMAÇÃO DE DOCUMENTOS
+                "confirmar_documentos_sim": {
+                    "acao": "iniciar_coleta_documentos",
+                    "mensagem": "✅ Perfeito! Vamos começar a coleta de documentos. Me peça para enviar documentos que inicio a sequência de envios com você! 📄",
+                    "proximo_passo": "aguardando_solicitacao_documentos"
+                },
+                "confirmar_documentos_nao": {
+                    "acao": "encerrar_processo_documentos",
+                    "mensagem": "Entendido! Qualquer dúvida sobre documentos, estaremos à disposição. Obrigado pelo contato! 👋",
+                    "proximo_passo": "processo_encerrado"
+                },
+                
                 # ESPAÇO PARA FUTUROS MENUS
                 # "menu_documentos_xxx": {...},
                 # "menu_status_xxx": {...},
@@ -626,3 +638,73 @@ class MenuServiceWhatsApp:
                 "erro": str(e),
                 "status_code": 500
             }
+
+    def enviar_menu_confirmacao_documentos(self, numero_telefone: str) -> Dict[str, Any]:
+        """
+        Envia menu de confirmação para prosseguir com coleta de documentos para locação
+        
+        Args:
+            numero_telefone (str): Número do telefone do destinatário
+            
+        Returns:
+            Dict: Resposta da API
+        """
+        try:
+            url = f"{self.api_host}/v1/message/send-list"
+            
+            params = {
+                "instanceId": self.instance_id
+            }
+            
+            payload = {
+                "phone": numero_telefone,
+                "title": "📄 Coleta de Documentos",
+                "description": "Deseja prosseguir com a coleta de documentos para sua locação?",
+                "buttonText": "Responder",
+                "footerText": f"{self.company_name} - Locação Sem Fiador",
+                "sections": [
+                    {
+                        "title": "Sua decisão:",
+                        "rows": [
+                            {
+                                "title": "✅ Sim, quero enviar documentos",
+                                "description": "Prosseguir com coleta de documentos",
+                                "rowId": "confirmar_documentos_sim"
+                            },
+                            {
+                                "title": "❌ Não, não quero agora",
+                                "description": "Encerrar processo por enquanto",
+                                "rowId": "confirmar_documentos_nao"
+                            }
+                        ]
+                    }
+                ],
+                "delayMessage": 1
+            }
+            
+            response = requests.post(url, json=payload, headers=self.headers, params=params)
+            
+            if response.status_code == 200:
+                logger.info("✅ Menu de confirmação de documentos enviado com sucesso")
+                return {
+                    "sucesso": True,
+                    "dados": response.json(),
+                    "status_code": response.status_code
+                }
+            else:
+                logger.error(f"❌ Erro ao enviar menu: {response.status_code}")
+                return {
+                    "sucesso": False,
+                    "erro": response.text,
+                    "status_code": response.status_code
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Erro ao enviar menu de confirmação de documentos: {str(e)}")
+            return {
+                "sucesso": False,
+                "erro": str(e),
+                "status_code": 500
+            }
+        
+        
