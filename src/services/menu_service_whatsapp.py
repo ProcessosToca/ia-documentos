@@ -142,7 +142,7 @@ class MenuServiceWhatsApp:
                 # MENU DE CONFIRMAÇÃO DE DOCUMENTOS
                 "confirmar_documentos_sim": {
                     "acao": "iniciar_coleta_documentos",
-                    "mensagem": "✅ Perfeito! Vamos começar a coleta de documentos. Me peça para enviar documentos que inicio a sequência de envios com você! 📄",
+                    "mensagem": "✅ Perfeito! Vamos começar a coleta de documentos. Vou te encaminhar a lista de Documentos necessários .",
                     "proximo_passo": "aguardando_solicitacao_documentos"
                 },
                 "confirmar_documentos_nao": {
