@@ -1694,6 +1694,95 @@ Vou conectar você com um de nossos atendentes para prosseguir com seu atendimen
                         del self.atendimentos_cliente[remetente]
                     logger.info(f"❌ Cliente recusou atendimento: {remetente}")
                 
+                # NOVO: Iniciar coleta de documentos
+                elif resultado_processamento["acao"] == "iniciar_coleta_documentos":
+                    logger.info(f"📄 Iniciando coleta de documentos para cliente: {remetente}")
+                    
+                    try:
+                        # Aguardar 1,5 segundos para estabilização
+                        time.sleep(1.5)
+                        
+                        # Importar função para criar mensagem de documentos
+                        from .buscar_usuarios_supabase import criar_mensagem_documentos_obrigatorios
+                        
+                        # Criar mensagem com documentos obrigatórios
+                        mensagem_documentos = criar_mensagem_documentos_obrigatorios()
+                        
+                        # Enviar mensagem para o cliente
+                        self.enviar_mensagem(remetente, mensagem_documentos)
+                        
+                        logger.info(f"✅ Mensagem de documentos enviada para: {remetente}")
+                        
+                        # NOVO: Enviar mensagem para o corretor
+                        try:
+                            # Aguardar 1 segundo antes de enviar para corretor
+                            time.sleep(1)
+                            
+                            # Obter dados do corretor e cliente da sessão
+                            corretor_telefone = self._obter_corretor_da_sessao(remetente)
+                            nome_cliente = self._obter_nome_cliente_da_sessao(remetente)
+                            
+                            if corretor_telefone:
+                                mensagem_corretor = f"✅ Cliente concordou com coleta de documentos. Fluxo iniciado."
+                                self.enviar_mensagem(corretor_telefone, mensagem_corretor)
+                                logger.info(f"✅ Mensagem enviada para corretor: {corretor_telefone}")
+                            else:
+                                logger.warning(f"⚠️ Não foi possível obter telefone do corretor para: {remetente}")
+                                
+                        except Exception as e:
+                            logger.error(f"❌ Erro ao enviar mensagem para corretor: {e}")
+                        
+                    except Exception as e:
+                        logger.error(f"❌ Erro ao enviar mensagem de documentos: {e}")
+                        
+                        # FALLBACK: Usar documentos da imagem se função falhar
+                        mensagem_fallback = """📄 *DOCUMENTOS OBRIGATÓRIOS*
+
+Ótimo! Vamos iniciar o Fluxo de Coleta de Documentos.
+
+Os documentos obrigatórios são:
+
+1. *Comprovante de Residência*
+   Conta de luz, água ou telefone
+
+2. *Comprovante de Renda*
+   Últimos 3 holerites ou declaração de renda
+
+3. *Certidão de Nascimento/Casamento*
+   Estado civil
+
+4. *RG / CNH*
+   Documento de identidade
+
+⚠️ *IMPORTANTE:* Todos os documentos devem estar em formato PDF.
+
+Envie um documento por vez. Vou te guiar durante todo o processo! 📋"""
+                        
+                        self.enviar_mensagem(remetente, mensagem_fallback)
+                        logger.info(f"✅ Mensagem de fallback enviada para: {remetente}")
+                
+                # NOVO: Encerrar processo de documentos (cliente não concordou)
+                elif resultado_processamento["acao"] == "encerrar_processo_documentos":
+                    logger.info(f"❌ Cliente não concordou com coleta de documentos: {remetente}")
+                    
+                    try:
+                        # Aguardar 1 segundo antes de enviar para corretor
+                        time.sleep(1)
+                        
+                        # Obter dados do corretor e cliente da sessão
+                        corretor_telefone = self._obter_corretor_da_sessao(remetente)
+                        nome_cliente = self._obter_nome_cliente_da_sessao(remetente)
+                        
+                        if corretor_telefone:
+                            mensagem_corretor = f"❌ Cliente não concordou com coleta de documentos. Entre em contato."
+                            self.enviar_mensagem(corretor_telefone, mensagem_corretor)
+                            logger.info(f"✅ Mensagem enviada para corretor: {corretor_telefone}")
+                        else:
+                            logger.warning(f"⚠️ Não foi possível obter telefone do corretor para: {remetente}")
+                            
+                    except Exception as e:
+                        logger.error(f"❌ Erro ao enviar mensagem para corretor: {e}")
+                
                 # LOG DETALHADO PARA MANUTENÇÃO
                 logger.info(f"📤 Mensagem enviada para colaborador {remetente}: {mensagem_resposta[:50]}...")
                 logger.info(f"🔄 Próximo passo definido: {resultado_processamento['proximo_passo']}")
