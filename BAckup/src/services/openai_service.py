@@ -518,179 +518,93 @@ SEMPRE retorne JSON válido sem texto adicional."""
                 "erro": str(e)
             }
 
+    def validar_telefone_deterministico(self, telefone: str) -> Dict[str, Any]:
+        """Validação determinística de telefone sem IA"""
+        import re
+        numeros = re.sub(r'\D', '', telefone)
+        if len(numeros) not in [10, 11]:
+            return {
+                "valido": False,
+                "motivo_erro": f"Telefone deve ter 10 ou 11 dígitos, tem {len(numeros)}",
+                "valor_original": telefone
+            }
+        ddd = numeros[:2]
+        if not (11 <= int(ddd) <= 99):
+            return {
+                "valido": False,
+                "motivo_erro": f"DDD {ddd} inválido",
+                "valor_original": telefone
+            }
+        if len(numeros) == 11:
+            formatado = f"({numeros[:2]}) {numeros[2:7]}-{numeros[7:]}"
+        else:
+            formatado = f"({numeros[:2]}) {numeros[2:6]}-{numeros[6:]}"
+        return {
+            "valido": True,
+            "valor_corrigido": formatado,
+            "valor_original": telefone
+        }
 
     def validar_dado_cliente(self, tipo_dado: str, valor: str) -> Dict[str, Any]:
         """
         Valida dados do cliente coletados durante processo de fechamento usando GPT
-        
-        Esta função usa IA para validar se os dados fornecidos pelo colaborador
-        são válidos para um processo de locação imobiliária.
-        
-        Args:
-            tipo_dado (str): Tipo do dado a validar ("nome" | "telefone")
-            valor (str): Valor fornecido pelo colaborador para validação
-            
-        Returns:
-            Dict com resultado da validação:
-                - valido: True se dado é válido, False se inválido
-                - valor_corrigido: Valor formatado/corrigido se necessário
-                - motivo_erro: Explicação se inválido
-                - sugestao: Sugestão de correção se aplicável
-        
-        Exemplos de uso:
-            >>> resultado = service.validar_dado_cliente("nome", "João Silva")
-            >>> print(resultado["valido"])  # True
-            
-            >>> resultado = service.validar_dado_cliente("telefone", "11999999999")
-            >>> print(resultado["valor_corrigido"])  # "(11) 99999-9999"
         """
         try:
             logger.info(f"🔍 Validando {tipo_dado}: {valor[:30]}...")
-            
+            if tipo_dado == "telefone":
+                return self.validar_telefone_deterministico(valor)
             if tipo_dado == "nome":
                 # Prompt para validação de nome
-                prompt = f"""Analise se este é um nome válido para um cliente de locação imobiliária:
-
-NOME: "{valor}"
-
-Critérios FLEXÍVEIS de validação:
-1. Deve conter pelo menos 2 palavras (nome + sobrenome)
-2. Deve usar caracteres alfabéticos (permitir acentos, espaços)
-3. Não deve conter números ou símbolos especiais
-4. Deve parecer um nome real de pessoa
-5. Aceitar nomes compostos, duplos, estrangeiros
-
-Exemplos VÁLIDOS: "João Silva", "Maria Santos", "José da Silva", "Ana Beatriz", "Carlos Eduardo", "Andreia Robe", "Maria José", "João Pedro"
-Exemplos INVÁLIDOS: "João", "123", "abc", "João123", "@#$", "X Y", "A B"
-
-IMPORTANTE: Seja FLEXÍVEL com nomes reais. Se parece um nome de pessoa válido com pelo menos 2 palavras, ACEITE.
-
-Responda APENAS em JSON:
-{{
-  "valido": true/false,
-  "valor_corrigido": "Nome formatado corretamente",
-  "motivo_erro": "Explicação se inválido",
-  "sugestao": "Sugestão de correção se necessário"
-}}"""
-
-            elif tipo_dado == "telefone":
-                # Prompt para validação de telefone
-                prompt = f"""Analise se este é um telefone válido brasileiro:
-
-TELEFONE: "{valor}"
-
-Critérios de validação:
-1. Deve ter 10 ou 11 dígitos (com DDD)
-2. DDD válido brasileiro (11-99)
-3. Número de celular ou fixo válido
-4. Pode ter ou não formatação
-5. Não deve conter letras
-
-Exemplos VÁLIDOS: "11999999999", "(11) 99999-9999", "1133334444"
-Exemplos INVÁLIDOS: "999999999", "abc", "123", "00999999999"
-
-Se válido, formate como: (XX) XXXXX-XXXX para celular ou (XX) XXXX-XXXX para fixo
-
-Responda APENAS em JSON:
-{{
-  "valido": true/false,
-  "valor_corrigido": "Telefone formatado: (XX) XXXXX-XXXX",
-  "motivo_erro": "Explicação se inválido",
-  "sugestao": "Sugestão de correção se necessário"
-}}"""
-
-            else:
-                return {
-                    "valido": False,
-                    "motivo_erro": f"Tipo de dado não suportado: {tipo_dado}",
-                    "sugestao": "Use 'nome' ou 'telefone'"
-                }
-
-            # Chamada para GPT com configurações de validação
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """Você é um validador especializado em dados de clientes para processos imobiliários.
-
-Sua função é verificar se os dados fornecidos são válidos e úteis para um processo de locação.
-
-Seja rigoroso na validação:
-- Nomes devem ser completos e reais
-- Telefones devem ser brasileiros válidos
-- Sempre formate corretamente os dados válidos
-- Forneça explicações claras para dados inválidos
-
-SEMPRE retorne JSON válido sem texto adicional."""
-                    },
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.1,  # Baixa criatividade para consistência na validação
-                max_tokens=200
-            )
-            
-            # Processar resposta do GPT
-            resposta_texto = response.choices[0].message.content.strip()
-            logger.info(f"🤖 Validação GPT: {resposta_texto[:100]}...")
-            
-            try:
-                # ✅ CORREÇÃO: Limpeza robusta do JSON
-                resposta_limpa = resposta_texto
-                
-                # Remover markdown se presente
-                if '```json' in resposta_limpa:
-                    resposta_limpa = resposta_limpa.split('```json')[1]
-                if '```' in resposta_limpa:
-                    resposta_limpa = resposta_limpa.split('```')[0]
-                
-                # Remover espaços e quebras de linha extras
-                resposta_limpa = resposta_limpa.strip()
-                
-                # Parse do JSON
-                resultado = json.loads(resposta_limpa)
-                
-                # Validar campos obrigatórios
-                if "valido" not in resultado:
-                    raise ValueError("Campo 'valido' ausente na resposta")
-                
-                # Adicionar informações de contexto
-                resultado.update({
-                    "tipo_dado": tipo_dado,
-                    "valor_original": valor,
-                    "timestamp_validacao": "now"
-                })
-                
-                status = "✅ VÁLIDO" if resultado["valido"] else "❌ INVÁLIDO"
-                logger.info(f"{status} - {tipo_dado}: {valor[:20]}...")
-                
-                return resultado
-                
-            except (json.JSONDecodeError, ValueError) as e:
-                logger.warning(f"⚠️ Erro ao processar JSON de validação: {e}")
-                logger.warning(f"🔍 Resposta original: {resposta_texto}")
-                
-                # ✅ CORREÇÃO: Fallback inteligente
-                # Tentar extrair informações básicas mesmo com JSON malformado
-                valido_detectado = False
-                if '"valido": true' in resposta_texto or '"valido":true' in resposta_texto:
-                    valido_detectado = True
-                
-                logger.info(f"🔄 Fallback aplicado - Válido: {valido_detectado}")
-                
-                # Fallback: considerar inválido se não conseguir processar
-                return {
-                    "valido": valido_detectado,
-                    "motivo_erro": "Erro interno na validação" if not valido_detectado else "Processamento com fallback",
-                    "sugestao": f"Tente novamente com um {tipo_dado} mais claro",
-                    "erro_processamento": str(e),
-                    "tipo_dado": tipo_dado,
-                    "valor_original": valor
-                }
-                
+                prompt = f"""Analise se este é um nome válido para um cliente de locação imobiliária:\n\nNOME: \"{valor}\"\n\nCritérios FLEXÍVEIS de validação:\n1. Deve conter pelo menos 2 palavras (nome + sobrenome)\n2. Deve usar caracteres alfabéticos (permitir acentos, espaços)\n3. Não deve conter números ou símbolos especiais\n4. Deve parecer um nome real de pessoa\n5. Aceitar nomes compostos, duplos, estrangeiros\n\nExemplos VÁLIDOS: \"João Silva\", \"Maria Santos\", \"José da Silva\", \"Ana Beatriz\", \"Carlos Eduardo\", \"Andreia Robe\", \"Maria José\", \"João Pedro\"\nExemplos INVÁLIDOS: \"João\", \"123\", \"abc\", \"João123\", \"@#$\", \"X Y\", \"A B\"\n\nIMPORTANTE: Seja FLEXÍVEL com nomes reais. Se parece um nome de pessoa válido com pelo menos 2 palavras, ACEITE.\n\nResponda APENAS em JSON:\n{{\n  \"valido\": true/false,\n  \"valor_corrigido\": \"Nome formatado corretamente\",\n  \"motivo_erro\": \"Explicação se inválido\",\n  \"sugestao\": \"Sugestão de correção se necessário\"\n}}"""
+                response = self.client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": """Você é um validador especializado em dados de clientes para processos imobiliários.\n\nSua função é verificar se os dados fornecidos são válidos e úteis para um processo de locação.\n\nSeja rigoroso na validação:\n- Nomes devem ser completos e reais\n- Telefones devem ser brasileiros válidos\n- Sempre formate corretamente os dados válidos\n- Forneça explicações claras para dados inválidos\n\nSEMPRE retorne JSON válido sem texto adicional."""
+                        },
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.1,  # Baixa criatividade para consistência na validação
+                    max_tokens=200
+                )
+                resposta_texto = response.choices[0].message.content.strip()
+                logger.info(f"🤖 Validação GPT: {resposta_texto[:100]}...")
+                try:
+                    resposta_limpa = resposta_texto
+                    if '```json' in resposta_limpa:
+                        resposta_limpa = resposta_limpa.split('```json')[1]
+                    if '```' in resposta_limpa:
+                        resposta_limpa = resposta_limpa.split('```')[0]
+                    resposta_limpa = resposta_limpa.strip()
+                    resultado = json.loads(resposta_limpa)
+                    if "valido" not in resultado:
+                        raise ValueError("Campo 'valido' ausente na resposta")
+                    resultado.update({
+                        "tipo_dado": tipo_dado,
+                        "valor_original": valor,
+                        "timestamp_validacao": "now"
+                    })
+                    status = "✅ VÁLIDO" if resultado["valido"] else "❌ INVÁLIDO"
+                    logger.info(f"{status} - {tipo_dado}: {valor[:20]}...")
+                    return resultado
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.warning(f"⚠️ Erro ao processar JSON de validação: {e}")
+                    logger.warning(f"🔍 Resposta original: {resposta_texto}")
+                    valido_detectado = False
+                    if '"valido": true' in resposta_texto or '"valido":true' in resposta_texto:
+                        valido_detectado = True
+                    logger.info(f"🔄 Fallback aplicado - Válido: {valido_detectado}")
+                    return {
+                        "valido": valido_detectado,
+                        "motivo_erro": "Erro interno na validação" if not valido_detectado else "Processamento com fallback",
+                        "sugestao": f"Tente novamente com um {tipo_dado} mais claro",
+                        "erro_processamento": str(e),
+                        "tipo_dado": tipo_dado,
+                        "valor_original": valor
+                    }
         except Exception as e:
             logger.error(f"❌ Erro crítico na validação de dados: {str(e)}")
-            # Fallback seguro: sempre rejeitar em caso de erro
             return {
                 "valido": False,
                 "motivo_erro": "Erro técnico na validação",
@@ -737,7 +651,7 @@ SEMPRE retorne JSON válido sem texto adicional."""
 
             ESPECIALIDADES:
             🏠 Processos de locação sem fiador
-            📄 Documentação necessária (RG, CPF, comprovantes)
+            📄 Documentação necessária (RG/CNH, comprovantes, certidão)
             💰 Análise de renda e capacidade financeira
             📋 Contratos e termos legais
             🔍 Validação de documentos

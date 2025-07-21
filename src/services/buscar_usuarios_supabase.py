@@ -297,6 +297,53 @@ def buscar_documentos_obrigatorios() -> List[dict]:
         logger.error(f"❌ Erro ao buscar documentos obrigatórios: {str(e)}")
         return []
 
+def obter_sequencia_coleta_documentos() -> List[dict]:
+    """
+    Obtém a sequência dinâmica de documentos obrigatórios para coleta
+    Busca no Supabase e retorna lista ordenada com fallback
+    
+    Returns:
+        List[dict]: Lista de documentos com nome e descrição, ordenados para coleta
+    """
+    try:
+        # Buscar documentos obrigatórios do Supabase
+        documentos = buscar_documentos_obrigatorios()
+        
+        # Se não encontrar no Supabase, usar fallback
+        if not documentos:
+            logger.warning("⚠️ Nenhum documento obrigatório encontrado no Supabase. Usando lista fallback.")
+            documentos = [
+                {"name": "Comprovante de Residência", "description": "Conta de luz, água ou telefone"},
+                {"name": "Comprovante de Renda", "description": "Últimos 3 holerites ou declaração de renda"},
+                {"name": "Certidão de Nascimento/Casamento", "description": "Estado civil"},
+                {"name": "RG / CNH", "description": "Documento de identidade"}
+            ]
+        
+        # Logar a sequência no terminal
+        logger.info("📋 SEQUÊNCIA DE COLETA DE DOCUMENTOS:")
+        logger.info("=" * 50)
+        for i, doc in enumerate(documentos, 1):
+            logger.info(f"{i}. {doc['name']}")
+            if doc.get('description'):
+                logger.info(f"   📝 {doc['description']}")
+            logger.info("")
+        
+        logger.info(f"✅ Total de documentos na sequência: {len(documentos)}")
+        logger.info("=" * 50)
+        
+        return documentos
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao obter sequência de documentos: {str(e)}")
+        # Retornar fallback em caso de erro
+        logger.warning("🔄 Usando lista fallback devido a erro")
+        return [
+            {"name": "Comprovante de Residência", "description": "Conta de luz, água ou telefone"},
+            {"name": "Comprovante de Renda", "description": "Últimos 3 holerites ou declaração de renda"},
+            {"name": "Certidão de Nascimento/Casamento", "description": "Estado civil"},
+            {"name": "RG / CNH", "description": "Documento de identidade"}
+        ]
+
 def criar_mensagem_documentos_obrigatorios() -> str:
     """
     Cria mensagem formatada com lista de documentos obrigatórios

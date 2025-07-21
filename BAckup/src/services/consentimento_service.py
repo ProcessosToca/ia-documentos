@@ -567,7 +567,7 @@ Coletamos informações pessoais e documentos que podem incluir:
 • CPF/RG ou outros documentos de identificação
 • Endereço
 • Dados de contato (telefone, e-mail, etc.)
-• Outros dados e documentos necessários para a prestação dos nossos serviços
+• RG ou CNH, comprovantes e outros dados necessários para a prestação dos nossos serviços
 
 *3. Finalidade da Coleta*
 Os dados e documentos coletados via WhatsApp serão utilizados exclusivamente para:

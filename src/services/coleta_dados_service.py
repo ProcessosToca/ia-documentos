@@ -136,13 +136,6 @@ class ColetaDadosService:
     def processar_resposta(self, telefone: str, resposta: str) -> Dict:
         """
         Processa resposta do cliente baseada na etapa atual
-        
-        Args:
-            telefone (str): Telefone do cliente
-            resposta (str): Resposta do cliente
-            
-        Returns:
-            Dict: Resultado do processamento
         """
         dados = self.dados_sessao.get(telefone)
         if not dados:
@@ -151,8 +144,7 @@ class ColetaDadosService:
                 'erro': 'Sessão de coleta não encontrada',
                 'acao': 'reiniciar_coleta'
             }
-        
-        # Processar baseado na etapa atual
+        # AJUSTE: Validação direta do CPF, sem IA
         if dados.etapa_atual == "cpf":
             return self._processar_cpf(dados, resposta)
         elif dados.etapa_atual == "email":
@@ -767,7 +759,7 @@ Digite o complemento ou:
         logger.info(f"   📄 CPF: {dados.cpf}")
         logger.info(f"   📧 Email: {dados.email}")
         logger.info(f"   📞 Telefone: {dados.telefone}")
-        logger.info(f"   📅 Data Nascimento: {dados.data_nascimento}")
+        logger.info(f"   �� Data Nascimento: {dados.data_nascimento}")
         logger.info(f"   🏠 Endereço: {dados.rua}, {dados.numero}")
         logger.info(f"   🌆 Cidade: {dados.cidade}")
         logger.info(f"   🏢 Estado: {dados.uf}")
@@ -1023,4 +1015,26 @@ Ocorreu um problema ao salvar seus dados. Vou transferir você para um atendente
         return {
             'total_sessoes_ativas': total_sessoes,
             'sessoes_por_etapa': sessoes_por_etapa
+        } 
+
+def upload_documento_supabase(file_path: str, negotiation_id: str, document_type_id: str) -> dict:
+    """
+    Faz upload do arquivo para o Supabase Storage e registra na tabela ai_documents.
+    Utiliza a lógica validada do DocumentUploader.
+    Args:
+        file_path (str): Caminho local do arquivo
+        negotiation_id (str): ID da negociação
+        document_type_id (str): ID do tipo de documento
+    Returns:
+        dict: Resultado do upload (sucesso, url, id, etc)
+    """
+    try:
+        from src.services.document_uploader import DocumentUploader
+        uploader = DocumentUploader()
+        return uploader.upload_document(file_path, negotiation_id, document_type_id)
+    except Exception as e:
+        logger.error(f"❌ Erro ao fazer upload do documento para o Supabase: {e}")
+        return {
+            'success': False,
+            'error': str(e)
         } 

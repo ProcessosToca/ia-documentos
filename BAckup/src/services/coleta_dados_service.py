@@ -375,23 +375,20 @@ Por favor, verifique o CEP e digite novamente:
             'sucesso': True,
             'dados_atualizados': True,
             'proxima_etapa': 'endereco_confirmacao',
+            'acao': 'enviar_menu_confirmacao_endereco',
             'mensagem': f"""✅ *Endereço encontrado:*
 
 📍 *{dados.endereco_completo}*
-🔢 *CEP:* {cep_limpo}
-
-Este endereço está correto?
-
-Digite:
-✅ *SIM* - para confirmar
-❌ *NÃO* - para informar o endereço correto"""
+🔢 *CEP:* {cep_limpo}""",
+            'endereco': dados.endereco_completo,
+            'cep': cep_limpo
         }
     
     def _processar_confirmacao_endereco(self, dados: DadosCliente, resposta: str) -> Dict:
         """Processa confirmação do endereço"""
         resposta_lower = resposta.lower().strip()
         
-        if resposta_lower in ['sim', 's', 'yes', 'correto', 'certo', '✅']:
+        if resposta == "confirmar_endereco_sim" or resposta_lower in ['sim', 's', 'yes', 'correto', 'certo', '✅']:
             # Endereço confirmado
             dados.etapa_atual = "numero"
             
@@ -506,9 +503,7 @@ Digite o complemento ou:
 📅 *Nascimento:* {dados.data_nascimento} ({dados.idade} anos)
 
 🏠 *Endereço:*
-{endereco_completo}
-
-⏰ *Aguarde que vou transferir você para o corretor responsável...*"""
+{endereco_completo}"""
     
     def salvar_cliente_supabase(self, dados: DadosCliente) -> Dict:
         """

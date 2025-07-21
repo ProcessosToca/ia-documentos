@@ -65,7 +65,7 @@ class MenuServiceWhatsApp:
                 },
                 "lista_documentos": {
                     "acao": "mostrar_lista_documentos",
-                    "mensagem": "📋 Documentos necessários:\n• RG ou CNH\n• CPF\n• Comprovante de renda\n• Comprovante de residência",
+                    "mensagem": "📋 Documentos necessários:\n• RG ou CNH\n• Comprovante de renda\n• Comprovante de residência\n• Certidão de nascimento/casamento (opcional)",
                     "proximo_passo": "aguardar_decisao"
                 },
                 "concordo_tudo": {
@@ -137,6 +137,30 @@ class MenuServiceWhatsApp:
                     "acao": "corrigir_endereco",
                     "mensagem": "❌ Vamos corrigir o endereço. Por favor, digite o CEP novamente:",
                     "proximo_passo": "aguardando_cep"
+                },
+                
+                # MENU DE CONFIRMAÇÃO DE DOCUMENTOS
+                "confirmar_documentos_sim": {
+                    "acao": "iniciar_coleta_documentos",
+                    "mensagem": "✅ Perfeito! Vamos começar a coleta de documentos. Vou te encaminhar a lista de Documentos necessários .",
+                    "proximo_passo": "aguardando_solicitacao_documentos"
+                },
+                "confirmar_documentos_nao": {
+                    "acao": "encerrar_processo_documentos",
+                    "mensagem": "Entendido! Qualquer dúvida sobre documentos, estaremos à disposição. Obrigado pelo contato! 👋",
+                    "proximo_passo": "processo_encerrado"
+                },
+                
+                # MENU DE INÍCIO DE COLETA DE DOCUMENTOS
+                "inicio_coleta_documentos_enviar": {
+                    "acao": "iniciar_upload_documento",
+                    "mensagem": "Ótimo! Envie o primeiro documento em PDF quando estiver pronto.",
+                    "proximo_passo": "aguardando_upload_documento"
+                },
+                "inicio_coleta_documentos_cancelar": {
+                    "acao": "cancelar_coleta_documentos",
+                    "mensagem": "Coleta de documentos cencelada!",
+                    "proximo_passo": "coleta_documentos_pausada"
                 },
                 
                 # ESPAÇO PARA FUTUROS MENUS
@@ -626,3 +650,134 @@ class MenuServiceWhatsApp:
                 "erro": str(e),
                 "status_code": 500
             }
+
+    def enviar_menu_confirmacao_documentos(self, numero_telefone: str) -> Dict[str, Any]:
+        """
+        Envia menu de confirmação para prosseguir com coleta de documentos para locação
+        
+        Args:
+            numero_telefone (str): Número do telefone do destinatário
+            
+        Returns:
+            Dict: Resposta da API
+        """
+        try:
+            url = f"{self.api_host}/v1/message/send-list"
+            
+            params = {
+                "instanceId": self.instance_id
+            }
+            
+            payload = {
+                "phone": numero_telefone,
+                "title": "📄 Coleta de Documentos",
+                "description": "Deseja prosseguir com a coleta de documentos para sua locação?",
+                "buttonText": "Responder",
+                "footerText": f"{self.company_name} - Locação Sem Fiador",
+                "sections": [
+                    {
+                        "title": "Sua decisão:",
+                        "rows": [
+                            {
+                                "title": "✅ Sim, quero enviar documentos",
+                                "description": "Prosseguir com coleta de documentos",
+                                "rowId": "confirmar_documentos_sim"
+                            },
+                            {
+                                "title": "❌ Não, não quero agora",
+                                "description": "Encerrar processo por enquanto",
+                                "rowId": "confirmar_documentos_nao"
+                            }
+                        ]
+                    }
+                ],
+                "delayMessage": 1
+            }
+            
+            response = requests.post(url, json=payload, headers=self.headers, params=params)
+            
+            if response.status_code == 200:
+                logger.info("✅ Menu de confirmação de documentos enviado com sucesso")
+                return {
+                    "sucesso": True,
+                    "dados": response.json(),
+                    "status_code": response.status_code
+                }
+            else:
+                logger.error(f"❌ Erro ao enviar menu: {response.status_code}")
+                return {
+                    "sucesso": False,
+                    "erro": response.text,
+                    "status_code": response.status_code
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Erro ao enviar menu de confirmação de documentos: {str(e)}")
+            return {
+                "sucesso": False,
+                "erro": str(e),
+                "status_code": 500
+            }
+
+    def enviar_menu_inicio_coleta_documentos(self, numero_telefone: str) -> Dict[str, Any]:
+        """
+        Envia menu para início do fluxo de coleta de documentos
+        Args:
+            numero_telefone (str): Número do telefone do destinatário
+        Returns:
+            Dict: Resposta da API
+        """
+        try:
+            url = f"{self.api_host}/v1/message/send-list"
+            params = {
+                "instanceId": self.instance_id
+            }
+            payload = {
+                "phone": numero_telefone,
+                "title": "📄 Coleta de Documentos",
+                "description": "Como deseja prosseguir com a coleta de documentos?",
+                "buttonText": "Escolher opção",
+                "footerText": f"{self.company_name} - Locação Sem Fiador",
+                "sections": [
+                    {
+                        "title": "Opções de Coleta",
+                        "rows": [
+                            {
+                                "title": "📤 Enviar documento agora",
+                                "description": "Iniciar envio do primeiro documento",
+                                "rowId": "inicio_coleta_documentos_enviar"
+                            },
+                            {
+                                "title": "⏸️ Cancelar coleta por enquanto",
+                                "description": "Pausar o envio de documentos",
+                                "rowId": "inicio_coleta_documentos_cancelar"
+                            }
+                        ]
+                    }
+                ],
+                "delayMessage": 1
+            }
+            response = requests.post(url, json=payload, headers=self.headers, params=params)
+            if response.status_code == 200:
+                logger.info("✅ Menu de início de coleta de documentos enviado com sucesso")
+                return {
+                    "sucesso": True,
+                    "dados": response.json(),
+                    "status_code": response.status_code
+                }
+            else:
+                logger.error(f"❌ Erro ao enviar menu de início de coleta: {response.status_code}")
+                return {
+                    "sucesso": False,
+                    "erro": response.text,
+                    "status_code": response.status_code
+                }
+        except Exception as e:
+            logger.error(f"❌ Erro ao enviar menu de início de coleta: {str(e)}")
+            return {
+                "sucesso": False,
+                "erro": str(e),
+                "status_code": 500
+            }
+        
+        
