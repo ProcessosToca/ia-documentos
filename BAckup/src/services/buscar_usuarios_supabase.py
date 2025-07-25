@@ -297,6 +297,40 @@ def buscar_documentos_obrigatorios() -> List[dict]:
         logger.error(f"❌ Erro ao buscar documentos obrigatórios: {str(e)}")
         return []
 
+def criar_mensagem_documentos_obrigatorios() -> str:
+    """
+    Cria mensagem formatada com lista de documentos obrigatórios
+    
+    Returns:
+        str: Mensagem formatada com lista de documentos obrigatórios
+    """
+    try:
+        documentos = buscar_documentos_obrigatorios()
+        
+        if not documentos:
+            logger.warning("⚠️ Nenhum documento obrigatório encontrado")
+            return "❌ Erro: Não foi possível carregar a lista de documentos obrigatórios."
+        
+        mensagem = "📄 *DOCUMENTOS OBRIGATÓRIOS*\n\n"
+        mensagem += "Ótimo! Vamos iniciar o Fluxo de Coleta de Documentos.\n\n"
+        mensagem += "Os documentos obrigatórios são:\n\n"
+        
+        for i, doc in enumerate(documentos, 1):
+            mensagem += f"{i}. *{doc['name']}*\n"
+            if doc.get('description'):
+                mensagem += f"   {doc['description']}\n"
+            mensagem += "\n"
+        
+        mensagem += "⚠️ *IMPORTANTE:* Todos os documentos devem estar em formato PDF.\n\n"
+        mensagem += "Envie um documento por vez. Vou te guiar durante todo o processo! 📋"
+        
+        logger.info(f"✅ Mensagem de documentos criada com {len(documentos)} documentos")
+        return mensagem
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar mensagem de documentos: {str(e)}")
+        return "❌ Erro ao carregar lista de documentos. Tente novamente."
+
 def buscar_documentos_recebidos(negotiation_id: str) -> List[dict]:
     """
     Busca documentos já recebidos para uma negociação (com cache)

@@ -8,6 +8,8 @@ from .menu_service_whatsapp import MenuServiceWhatsApp
 from .whatsapp_api import WhatsAppAPI
 from .session_manager import SessionManager
 import time
+import requests
+from datetime import datetime
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
@@ -496,17 +498,123 @@ class WhatsAppService:
     def processar_webhook_mensagem(self, webhook_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Processa dados do webhook de mensagem recebida (Formato W-API)
-        
         MODULARIZADO: Esta função agora usa WhatsAppAPI
-        
-        Args:
-            webhook_data (Dict): Dados do webhook da W-API
-            
-        Returns:
-            Dict: Dados processados da mensagem
         """
+        # NOVO: Interceptar recebimento de PDF ou imagem para baixar e avançar sequência de coleta
+        try:
+            msgContent = webhook_data.get("msgContent", {})
+            remetente = webhook_data.get("sender", {}).get("id") or webhook_data.get("chat", {}).get("id")
+            doc = msgContent.get("documentMessage")
+            img = msgContent.get("imageMessage") if "imageMessage" in msgContent else None
+            if doc and doc.get("mimetype") == "application/pdf":
+                logger.info(f"📥 Documento PDF recebido de {remetente}")
+                # Baixar e salvar documento antes de avançar
+                try:
+                    indice = None
+                    if hasattr(self, '_controle_coleta_documentos') and remetente in self._controle_coleta_documentos:
+                        indice = self._controle_coleta_documentos[remetente]['indice_atual'] + 1
+                    self.baixar_e_salvar_documento(
+                        media_key=doc["mediaKey"],
+                        direct_path=doc["directPath"],
+                        tipo="document",
+                        mimetype=doc["mimetype"],
+                        file_name=doc.get("fileName", "documento.pdf"),
+                        remetente=remetente,
+                        indice=indice
+                    )
+                    
+                    # ✅ NOVO: Registrar mensagem de documento no ConversationLogger
+                    if self.logging_enabled and self.conversation_logger:
+                        try:
+                            conv_id = self.conversation_logger.obter_conversa_ativa_por_telefone(remetente)
+                            if conv_id:
+                                self.conversation_logger.log_message(
+                                    conversation_id=conv_id,
+                                    sender=remetente,
+                                    receiver=self.numero_whatsapp,
+                                    content=f"📄 Documento enviado: {doc.get('fileName', 'documento.pdf')}",
+                                    message_type="document",
+                                    timestamp=datetime.now().isoformat(),
+                                    metadata={
+                                        "file_name": doc.get("fileName", "documento.pdf"),
+                                        "mimetype": doc["mimetype"],
+                                        "media_key": doc["mediaKey"],
+                                        "document_type": "pdf"
+                                    }
+                                )
+                                logger.info(f"✅ Mensagem de documento registrada no ConversationLogger: {doc.get('fileName', 'documento.pdf')}")
+                        except Exception as e:
+                            logger.error(f"❌ Erro ao registrar mensagem de documento no ConversationLogger: {e}")
+                    
+                except Exception as e:
+                    logger.error(f"❌ Erro ao baixar/salvar documento: {e}")
+                self._avancar_coleta_documentos(remetente)
+            elif img:
+                logger.info(f"📥 Imagem recebida de {remetente}")
+                try:
+                    indice = None
+                    if hasattr(self, '_controle_coleta_documentos') and remetente in self._controle_coleta_documentos:
+                        indice = self._controle_coleta_documentos[remetente]['indice_atual'] + 1
+                    self.baixar_e_salvar_documento(
+                        media_key=img["mediaKey"],
+                        direct_path=img["directPath"],
+                        tipo="image",
+                        mimetype=img.get("mimetype", "image/jpeg"),
+                        file_name=img.get("fileName", "imagem.jpg"),
+                        remetente=remetente,
+                        indice=indice
+                    )
+                    
+                    # ✅ NOVO: Registrar mensagem de imagem no ConversationLogger
+                    if self.logging_enabled and self.conversation_logger:
+                        try:
+                            conv_id = self.conversation_logger.obter_conversa_ativa_por_telefone(remetente)
+                            if conv_id:
+                                self.conversation_logger.log_message(
+                                    conversation_id=conv_id,
+                                    sender=remetente,
+                                    receiver=self.numero_whatsapp,
+                                    content=f"📷 Imagem enviada: {img.get('fileName', 'imagem.jpg')}",
+                                    message_type="image",
+                                    timestamp=datetime.now().isoformat(),
+                                    metadata={
+                                        "file_name": img.get("fileName", "imagem.jpg"),
+                                        "mimetype": img.get("mimetype", "image/jpeg"),
+                                        "media_key": img["mediaKey"],
+                                        "document_type": "image"
+                                    }
+                                )
+                                logger.info(f"✅ Mensagem de imagem registrada no ConversationLogger: {img.get('fileName', 'imagem.jpg')}")
+                        except Exception as e:
+                            logger.error(f"❌ Erro ao registrar mensagem de imagem no ConversationLogger: {e}")
+                    
+                except Exception as e:
+                    logger.error(f"❌ Erro ao baixar/salvar imagem: {e}")
+                self._avancar_coleta_documentos(remetente)
+        except Exception as e:
+            logger.error(f"❌ Erro ao processar recebimento de documento/imagem para coleta: {e}")
         # Redirecionar para o módulo WhatsAppAPI
         return self.whatsapp_api.processar_webhook_mensagem(webhook_data)
+
+    def _avancar_coleta_documentos(self, remetente: str):
+        """
+        Avança para o próximo documento da sequência com tempo de espera para múltiplos arquivos.
+        """
+        try:
+            # Aguardar 1 minutos para múltiplos arquivos
+            tempo_espera = 40 # 1minutos
+            logger.info(f"⏰ Aguardando {tempo_espera}s para múltiplos arquivos de {remetente}...")
+            time.sleep(tempo_espera)
+            
+            # Avançar normalmente
+            if hasattr(self, '_controle_coleta_documentos') and remetente in self._controle_coleta_documentos:
+                self._controle_coleta_documentos[remetente]['indice_atual'] += 1
+                self.solicitar_proximo_documento(remetente)
+            else:
+                logger.info(f"Usuário {remetente} não está em sequência de coleta ativa.")
+                
+        except Exception as e:
+            logger.error(f"❌ Erro ao avançar coleta para {remetente}: {e}")
     
     def primeira_mensagem(self, remetente: str, message_id: str = None) -> Dict[str, Any]:
         """
@@ -1079,6 +1187,19 @@ Não foi possível prosseguir com a coleta automática. Entre em contato diretam
                             if corretor_telefone:
                                 self.enviar_mensagem(corretor_telefone, resultado['mensagem'])
                                 logger.info(f"✅ Mensagem final enviada também para corretor: {corretor_telefone}")
+                                
+                                # ✅ NOVA FUNCIONALIDADE: Capturar mensagem para corretor com classificação automática
+                                if self.logging_enabled and self.conversation_logger:
+                                    conv_id = self.conversation_logger.obter_conversa_ativa_por_telefone(remetente)
+                                    if conv_id:
+                                        self.conversation_logger.add_message_enhanced(
+                                            conversation_id=conv_id,
+                                            sender="ia",
+                                            receiver="cliente",  # Será corrigido automaticamente para "corretor"
+                                            content=resultado['mensagem'],
+                                            phase="ia_cliente",
+                                            telefone_destinatario=corretor_telefone  # ✅ CLASSIFICAÇÃO AUTOMÁTICA!
+                                        )
                         except Exception as e:
                             logger.warning(f"⚠️ Erro ao enviar mensagem para corretor: {e}")
                     
@@ -1586,6 +1707,22 @@ Vou conectar você com um de nossos atendentes para prosseguir com seu atendimen
                 mensagem_resposta = resultado_processamento["mensagem_resposta"]
                 self.enviar_mensagem(remetente, mensagem_resposta)
                 
+                # ✅ NOVO: Registrar mensagem da IA no JSON
+                if self.logging_enabled and self.conversation_logger:
+                    try:
+                        conversation_id = self.conversation_logger.get_active_conversation_id(remetente)
+                        if conversation_id:
+                            self.conversation_logger.add_message_enhanced(
+                                conversation_id,
+                                "ia",
+                                "corretor",
+                                mensagem_resposta,
+                                "ia_corretor",
+                                telefone_destinatario=remetente
+                            )
+                    except Exception as e:
+                        logger.warning(f"⚠️ Erro ao registrar mensagem da IA no JSON: {e}")
+                
                 # VERIFICAR AÇÕES ESPECIAIS DOS COLABORADORES
                 # ==========================================
                 
@@ -1732,6 +1869,13 @@ Vou conectar você com um de nossos atendentes para prosseguir com seu atendimen
                         except Exception as e:
                             logger.error(f"❌ Erro ao enviar mensagem para corretor: {e}")
                         
+                        # NOVO: Enviar menu de início de coleta de documentos para o cliente
+                        try:
+                            self.menu_service.enviar_menu_inicio_coleta_documentos(remetente)
+                            logger.info(f"✅ Menu de início de coleta de documentos enviado para: {remetente}")
+                        except Exception as e:
+                            logger.error(f"❌ Erro ao enviar menu de início de coleta de documentos: {e}")
+                
                     except Exception as e:
                         logger.error(f"❌ Erro ao enviar mensagem de documentos: {e}")
                         
@@ -1786,6 +1930,17 @@ Envie um documento por vez. Vou te guiar durante todo o processo! 📋"""
                 # LOG DETALHADO PARA MANUTENÇÃO
                 logger.info(f"📤 Mensagem enviada para colaborador {remetente}: {mensagem_resposta[:50]}...")
                 logger.info(f"🔄 Próximo passo definido: {resultado_processamento['proximo_passo']}")
+                
+                # Após enviar a mensagem de resposta ao colaborador, obter sequência se for início de upload de documento
+                if resultado_processamento["acao"] == "iniciar_upload_documento":
+                    try:
+                        from .buscar_usuarios_supabase import obter_sequencia_coleta_documentos
+                        sequencia = obter_sequencia_coleta_documentos()
+                        logger.info(f"[DEBUG] Sequência de coleta de documentos obtida para {remetente}: {sequencia}")
+                        # Solicitar o primeiro documento da sequência
+                        self.solicitar_proximo_documento(remetente)
+                    except Exception as e:
+                        logger.error(f"❌ Erro ao obter sequência de coleta de documentos: {e}")
                 
                 return {
                     "sucesso": True,
@@ -2709,3 +2864,242 @@ Esta Política pode ser atualizada a qualquer momento para garantir nossa confor
                 'mensagem': 'Erro ao processar sua resposta. Por favor, tente novamente.',
                 'erro': str(e)
             }
+
+    def solicitar_proximo_documento(self, remetente: str):
+        """
+        Solicita o próximo documento da sequência de coleta de documentos
+        """
+        try:
+            from .buscar_usuarios_supabase import obter_sequencia_coleta_documentos
+            # Exemplo de controle simples em memória (pode evoluir para banco/sessão)
+            if not hasattr(self, '_controle_coleta_documentos'):
+                self._controle_coleta_documentos = {}
+            # Obter sequência para o usuário (ou inicializar)
+            if remetente not in self._controle_coleta_documentos:
+                sequencia = obter_sequencia_coleta_documentos()
+                self._controle_coleta_documentos[remetente] = {
+                    'sequencia': sequencia,
+                    'indice_atual': 0,
+                    'documentos_recebidos': []
+                }
+            controle = self._controle_coleta_documentos[remetente]
+            sequencia = controle['sequencia']
+            indice = controle['indice_atual']
+            # Verificar se ainda há documentos a solicitar
+            if indice < len(sequencia):
+                doc = sequencia[indice]
+                nome = doc.get('name', 'Documento')
+                descricao = doc.get('description', '')
+                
+                # NOVO: Mensagem com informação sobre tempo de espera
+                mensagem = f"📄 *{nome}*\n"
+                if descricao:
+                    mensagem += f"📝 {descricao}\n\n"
+                
+                mensagem += "📤 Envie os arquivos deste documento.\n"
+                mensagem += "⏰ Aguardarei 1 minuto antes de continuar."
+                
+                self.enviar_mensagem(remetente, mensagem)
+                logger.info(f"Solicitado documento '{nome}' para {remetente} (etapa {indice+1}/{len(sequencia)})")
+            else:
+                # ✅ NOVO: FINALIZAÇÃO COMPLETA - TODOS OS DOCUMENTOS ENVIADOS
+                self.enviar_mensagem(remetente, "✅ Todos os documentos foram enviados!")
+                logger.info(f"Sequência de coleta finalizada para {remetente}")
+                
+                # ✅ NOVO: FINALIZAR PROCESSO COMPLETO
+                try:
+                    from .coleta_dados_service import ColetaDadosService
+                    coleta_service = ColetaDadosService()
+                    
+                    # Buscar negotiation_id (pode ser armazenado na sessão)
+                    negotiation_id = self._obter_negotiation_id_do_cliente(remetente)
+                    
+                    if negotiation_id:
+                        logger.info(f"🔍 Negotiation ID encontrado para finalização: {negotiation_id}")
+                        resultado_finalizacao = coleta_service.finalizar_processo_completo(remetente, negotiation_id)
+                        
+                        if resultado_finalizacao['sucesso']:
+                            logger.info(f"🎉 Processo completo finalizado com sucesso: {remetente}")
+                            logger.info(f" {resultado_finalizacao['mensagens_sincronizadas']} mensagens sincronizadas")
+                        else:
+                            logger.error(f"❌ Erro na finalização completa: {resultado_finalizacao['erro']}")
+                    else:
+                        logger.warning(f"⚠️ Negotiation ID não encontrado para finalização: {remetente}")
+                        logger.warning(f"⚠️ Tentando buscar dados da sessão de coleta...")
+                        
+                        # Tentar obter da sessão de coleta diretamente
+                        dados_sessao = coleta_service.obter_dados_sessao(remetente)
+                        if dados_sessao and hasattr(dados_sessao, 'negotiation_id') and dados_sessao.negotiation_id:
+                            logger.info(f"✅ Negotiation ID encontrado na sessão: {dados_sessao.negotiation_id}")
+                            resultado_finalizacao = coleta_service.finalizar_processo_completo(remetente, dados_sessao.negotiation_id)
+                            
+                            if resultado_finalizacao['sucesso']:
+                                logger.info(f"🎉 Processo completo finalizado com sucesso: {remetente}")
+                                logger.info(f" {resultado_finalizacao['mensagens_sincronizadas']} mensagens sincronizadas")
+                            else:
+                                logger.error(f"❌ Erro na finalização completa: {resultado_finalizacao['erro']}")
+                        else:
+                            logger.error(f"❌ Negotiation ID não encontrado em nenhum local para {remetente}")
+                        
+                except Exception as e:
+                    logger.error(f"❌ Erro ao finalizar processo completo: {e}")
+                
+                # Limpar controle de coleta
+                if remetente in self._controle_coleta_documentos:
+                    del self._controle_coleta_documentos[remetente]
+                    
+        except Exception as e:
+            logger.error(f"❌ Erro ao solicitar próximo documento para {remetente}: {e}")
+    
+    def _obter_negotiation_id_do_cliente(self, telefone_cliente: str) -> Optional[str]:
+        """
+        ✅ MELHORADO: Obtém o negotiation_id do cliente com múltiplos fallbacks
+        """
+        try:
+            # 1. Buscar na sessão de coleta
+            from .coleta_dados_service import ColetaDadosService
+            coleta_service = ColetaDadosService()
+            dados_sessao = coleta_service.obter_dados_sessao(telefone_cliente)
+            
+            if dados_sessao and hasattr(dados_sessao, 'negotiation_id') and dados_sessao.negotiation_id:
+                logger.info(f"✅ Negotiation ID encontrado na sessão: {dados_sessao.negotiation_id}")
+                return dados_sessao.negotiation_id
+            
+            # 2. Fallback: buscar pelo telefone no banco
+            from .document_uploader import get_negotiation_id_by_phone
+            negotiation_id = get_negotiation_id_by_phone(telefone_cliente)
+            
+            if negotiation_id:
+                logger.info(f"✅ Negotiation ID encontrado via fallback: {negotiation_id}")
+                return negotiation_id
+            
+            # 3. Fallback: buscar na sessão ativa do WhatsApp
+            sessao_ativa = self.sessoes_ativas.get(telefone_cliente, {})
+            if sessao_ativa.get('negotiation_id'):
+                logger.info(f"✅ Negotiation ID encontrado na sessão WhatsApp: {sessao_ativa['negotiation_id']}")
+                return sessao_ativa['negotiation_id']
+            
+            # 4. Fallback: buscar diretamente no banco por telefone mais recente
+            try:
+                from src.services.buscar_usuarios_supabase import obter_cliente_supabase
+                supabase = obter_cliente_supabase()
+                
+                # Buscar negociação mais recente pelo telefone do cliente
+                # Tentar diferentes campos possíveis
+                result = supabase.table('ai_negotiations').select('id, client_phone, client_id').order('created_at', desc=True).limit(10).execute()
+                
+                # Filtrar pelo telefone
+                for neg in result.data:
+                    if neg.get('client_phone') == telefone_cliente:
+                        negotiation_id = neg['id']
+                        logger.info(f"✅ Negotiation ID encontrado no banco: {negotiation_id}")
+                        return negotiation_id
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao buscar negotiation_id no banco: {e}")
+            
+            logger.warning(f"⚠️ Negotiation ID não encontrado para {telefone_cliente}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao obter negotiation ID: {e}")
+            return None
+
+    def baixar_e_salvar_documento(
+        self,
+        media_key: str,
+        direct_path: str,
+        tipo: str,
+        mimetype: str,
+        file_name: str,
+        remetente: str,
+        indice: int = None,
+        pasta_destino: str = "Clientes/Documentos"
+    ) -> str:
+        """
+        Baixa o arquivo da W-API e salva na pasta destino.
+        Retorna o caminho do arquivo salvo ou None em caso de erro.
+        """
+        try:
+            # 1. Montar o payload e headers
+            instance_id = os.getenv('W_API_INSTANCE_ID')
+            w_api_token = os.getenv('W_API_TOKEN')
+            if not instance_id or not w_api_token:
+                logger.error("❌ Variáveis de ambiente W_API_INSTANCE_ID ou W_API_TOKEN não configuradas.")
+                return None
+            url = f"https://api.w-api.app/v1/message/download-media?instanceId={instance_id}"
+            headers = {
+                "Authorization": f"Bearer {w_api_token}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "mediaKey": media_key,
+                "directPath": direct_path,
+                "type": tipo,
+                "mimetype": mimetype
+            }
+            # 2. Fazer POST para a API de download
+            response = requests.post(url, json=payload, headers=headers)
+            if response.status_code != 200:
+                logger.error(f"❌ Erro ao requisitar download-media: {response.status_code} - {response.text}")
+                return None
+            data = response.json()
+            if data.get("error") or not data.get("fileLink"):
+                logger.error(f"❌ Erro na resposta da API de download-media: {data}")
+                return None
+            file_link = data["fileLink"]
+            # 3. Baixar o arquivo do fileLink
+            file_response = requests.get(file_link)
+            if file_response.status_code != 200:
+                logger.error(f"❌ Erro ao baixar arquivo: {file_response.status_code}")
+                return None
+            # 4. Garantir que a pasta existe
+            os.makedirs(pasta_destino, exist_ok=True)
+            # 5. Montar nome do arquivo
+            timestamp = int(time.time())
+            ext = os.path.splitext(file_name)[1] or ".bin"
+            nome_base = os.path.splitext(file_name)[0][:30].replace(" ", "_")
+            nome_arquivo = f"{remetente}_{indice or ''}_{nome_base}_{timestamp}{ext}"
+            caminho_arquivo = os.path.join(pasta_destino, nome_arquivo)
+            # 6. Salvar o arquivo
+            with open(caminho_arquivo, "wb") as f:
+                f.write(file_response.content)
+            logger.info(f"✅ Arquivo salvo em: {caminho_arquivo}")
+            # NOVO: Upload automático para Supabase
+            try:
+                negotiation_id = self.sessoes_ativas.get(remetente, {}).get('negotiation_id')
+                
+                # FALLBACK: Se não encontrar na sessão, busca pelo telefone
+                if not negotiation_id:
+                    logger.info(f"[UPLOAD SUPABASE] negotiation_id não encontrado na sessão para {remetente}, buscando pelo telefone...")
+                    from src.services.document_uploader import get_negotiation_id_by_phone
+                    negotiation_id = get_negotiation_id_by_phone(remetente)
+                    if negotiation_id:
+                        logger.info(f"[UPLOAD SUPABASE] ✅ negotiation_id encontrado via fallback: {negotiation_id}")
+                    else:
+                        logger.warning(f"[UPLOAD SUPABASE] ❌ negotiation_id não encontrado nem na sessão nem pelo telefone para {remetente}")
+                
+                if hasattr(self, '_controle_coleta_documentos') and remetente in self._controle_coleta_documentos:
+                    indice = self._controle_coleta_documentos[remetente]['indice_atual']
+                    sequencia = self._controle_coleta_documentos[remetente]['sequencia']
+                    if indice < len(sequencia):
+                        document_type_id = sequencia[indice]['id']
+                    else:
+                        document_type_id = None
+                else:
+                    document_type_id = None
+                if negotiation_id and document_type_id:
+                    from src.services.coleta_dados_service import upload_documento_supabase
+                    resultado_upload = upload_documento_supabase(
+                        file_path=caminho_arquivo,
+                        negotiation_id=negotiation_id,
+                        document_type_id=document_type_id
+                    )
+                    logger.info(f"[UPLOAD SUPABASE] Resultado: {resultado_upload}")
+                else:
+                    logger.warning(f"[UPLOAD SUPABASE] negotiation_id ou document_type_id não encontrado para {remetente}")
+            except Exception as e:
+                logger.error(f"[UPLOAD SUPABASE] Erro ao tentar upload automático: {e}")
+            return caminho_arquivo
+        except Exception as e:
+            logger.error(f"❌ Erro ao baixar/salvar documento: {e}")
+            return None
