@@ -23,7 +23,7 @@ import re
 import requests
 import logging
 from datetime import datetime, date
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, Optional, Tuple, List, Any
 from dataclasses import dataclass, asdict
 
 # Configuração de logging
@@ -61,6 +61,9 @@ class DadosCliente:
     timestamp_conclusao: str = ""
     consentimento_verificado: bool = False
     pode_coletar_dados: bool = True
+    
+    # ✅ NOVO: ID da negociação
+    negotiation_id: str = ""
 
 class ColetaDadosService:
     """
@@ -759,7 +762,7 @@ Digite o complemento ou:
         logger.info(f"   📄 CPF: {dados.cpf}")
         logger.info(f"   📧 Email: {dados.email}")
         logger.info(f"   📞 Telefone: {dados.telefone}")
-        logger.info(f"   �� Data Nascimento: {dados.data_nascimento}")
+        logger.info(f"   📅 Data Nascimento: {dados.data_nascimento}")
         logger.info(f"   🏠 Endereço: {dados.rua}, {dados.numero}")
         logger.info(f"   🌆 Cidade: {dados.cidade}")
         logger.info(f"   🏢 Estado: {dados.uf}")
@@ -792,6 +795,10 @@ Digite o complemento ou:
                 resultado_final['negociacao_criada'] = True
                 resultado_final['negociacao_id'] = resultado_negociacao['negociacao_id']
                 logger.info(f"✅ Negociação criada: {resultado_negociacao['negociacao_id']}")
+                
+                # ✅ NOVO: Armazenar negotiation_id na sessão
+                dados.negotiation_id = resultado_negociacao['negociacao_id']
+                logger.info(f"💾 Negotiation ID armazenado na sessão: {dados.negotiation_id}")
                 
                 # 3. NOVO: Atualizar dados do cliente na conversa e sincronizar com Supabase
                 resultado_final['conversa_sincronizada'] = False
@@ -845,20 +852,60 @@ Digite o complemento ou:
                             resultado_final['dados_cliente_atualizados'] = True
                             logger.info(f"✅ Dados do cliente atualizados na conversa: {conv_id}")
                             
-                            # 🔥 CRÍTICO: Forçar salvamento imediato na pasta em_andamento
+                            # 🔥 CRÍTICO: Forçar salvamento COMPLETO antes de finalizar
                             if conv_id in conversation_logger.active_conversations:
                                 conversation_logger._save_conversation(conv_id, "em_andamento")
-                                logger.info(f"💾 Conversa salva com dados atualizados: {conv_id}")
+                                
+                                # ✅ NOVO: Aguardar um momento para garantir salvamento
+                                import time
+                                time.sleep(0.5)
+                                
+                                # ✅ NOVO: Verificar se salvamento foi bem-sucedido
+                                conversa_verificacao = conversation_logger._carregar_conversa_do_arquivo(conv_id)
+                                if conversa_verificacao and 'messages' in conversa_verificacao:
+                                    logger.info(f"✅ Conversa salva COMPLETAMENTE: {conv_id} ({len(conversa_verificacao['messages'])} mensagens)")
+                                else:
+                                    logger.error(f"❌ Falha ao verificar salvamento da conversa: {conv_id}")
                         else:
                             logger.warning(f"⚠️ Falha ao atualizar dados do cliente: {conv_id}")
                     
                     # Segundo: Finalizar conversa (mover de em_andamento para finalizadas)
-                    resultado_finalizacao = conversation_logger.finalizar_conversa_por_telefone(dados.telefone)
+                    # ✅ AJUSTE: NÃO finalizar aqui - só no final de tudo
+                    # resultado_finalizacao = conversation_logger.finalizar_conversa_por_telefone(dados.telefone)
+                    
+                    # ✅ NOVO: Apenas marcar que dados foram coletados
+                    resultado_finalizacao = {
+                        'sucesso': True,
+                        'conversation_id': conv_id,
+                        'mensagem': 'Dados coletados, continuando com documentos...'
+                    }
                     
                     if resultado_finalizacao['sucesso']:
-                        resultado_final['conversa_finalizada'] = True
+                        resultado_final['conversa_finalizada'] = False  # ✅ MUDADO: Não finalizar ainda
                         resultado_final['conversation_id'] = resultado_finalizacao['conversation_id']
-                        logger.info(f"✅ Conversa finalizada: {resultado_finalizacao['conversation_id']}")
+                        logger.info(f"✅ Dados coletados, conversa continua em andamento: {resultado_finalizacao['conversation_id']}")
+                        
+                        # ✅ NOVO: NÃO sincronizar ainda - só no final de tudo
+                        # resultado_sync = conversation_logger.sincronizar_conversa_supabase_com_limpeza(
+                        #     conversation_id=resultado_finalizacao['conversation_id'],
+                        #     negotiation_id=resultado_negociacao['negociacao_id']
+                        # )
+                        
+                        # ✅ NOVO: Marcar que sincronização será feita no final
+                        resultado_final['conversa_sincronizada'] = False
+                        resultado_final['mensagem_sincronizacao'] = 'Sincronização será feita após coleta completa de documentos'
+                        logger.info(f"🔄 Sincronização adiada - será feita após documentos completos")
+                        
+                        # ✅ NOVO: Aguardar um momento para garantir salvamento
+                        import time
+                        time.sleep(0.5)
+                        
+                        # ✅ NOVO: Verificar se salvamento foi bem-sucedido
+                        conversa_verificacao = conversation_logger._carregar_conversa_do_arquivo(conv_id)
+                        if conversa_verificacao and 'messages' in conversa_verificacao:
+                            logger.info(f"✅ Conversa salva COMPLETAMENTE: {conv_id} ({len(conversa_verificacao['messages'])} mensagens)")
+                        else:
+                            logger.error(f"❌ Falha ao verificar salvamento da conversa: {conv_id}")
                         
                         # Segundo: Sincronizar conversa finalizada com Supabase + LIMPEZA OPENAI 🧠
                         logger.info(f"🧠 Iniciando sincronização com limpeza OpenAI...")
@@ -926,6 +973,72 @@ Ocorreu um problema ao salvar seus dados. Vou transferir você para um atendente
             logger.error("❌ Finalização falhou completamente")
         
         return resultado_final
+    
+    def finalizar_processo_completo(self, telefone: str, negotiation_id: str) -> Dict[str, Any]:
+        """
+        ✅ NOVA: Finaliza conversa APENAS quando TUDO terminar
+        (coleta de dados + documentos + análise completa)
+        
+        Args:
+            telefone (str): Telefone do cliente
+            negotiation_id (str): ID da negociação no Supabase
+            
+        Returns:
+            Dict: Resultado da finalização completa
+        """
+        try:
+            logger.info(f"🎯 Iniciando finalização completa do processo: {telefone}")
+            logger.info(f"📋 Negotiation ID recebido: {negotiation_id}")
+            
+            # Importar ConversationLogger
+            from src.services.conversation_logger import ConversationLogger
+            conversation_logger = ConversationLogger()
+            
+            # 1. Finalizar conversa (mover de em_andamento para finalizadas)
+            resultado_finalizacao = conversation_logger.finalizar_conversa_por_telefone(telefone)
+            
+            if resultado_finalizacao['sucesso']:
+                logger.info(f"✅ Conversa finalizada: {resultado_finalizacao['conversation_id']}")
+                
+                # 2. Sincronizar conversa finalizada com Supabase + LIMPEZA OPENAI 🧠
+                logger.info(f"🧠 Iniciando sincronização final com limpeza OpenAI...")
+                resultado_sync = conversation_logger.sincronizar_conversa_supabase_com_limpeza(
+                    conversation_id=resultado_finalizacao['conversation_id'],
+                    negotiation_id=negotiation_id
+                )
+                
+                if resultado_sync['sucesso']:
+                    logger.info(f"✅ Sincronização final concluída: {resultado_sync['mensagens_sincronizadas']} mensagens")
+                    return {
+                        'sucesso': True,
+                        'conversa_finalizada': True,
+                        'conversation_id': resultado_finalizacao['conversation_id'],
+                        'mensagens_sincronizadas': resultado_sync['mensagens_sincronizadas'],
+                        'limpeza_aplicada': True,
+                        'mensagens_removidas': resultado_sync.get('mensagens_removidas', 0),
+                        'mensagens_reformatadas': resultado_sync.get('mensagens_reformatadas', 0)
+                    }
+                else:
+                    logger.warning(f"⚠️ Falha na sincronização final: {resultado_sync['erro']}")
+                    return {
+                        'sucesso': False,
+                        'erro': f'Falha na sincronização: {resultado_sync["erro"]}',
+                        'conversa_finalizada': True,
+                        'conversation_id': resultado_finalizacao['conversation_id']
+                    }
+            else:
+                logger.error(f"❌ Falha ao finalizar conversa: {resultado_finalizacao['erro']}")
+                return {
+                    'sucesso': False,
+                    'erro': f'Falha ao finalizar conversa: {resultado_finalizacao["erro"]}'
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Erro na finalização completa: {str(e)}")
+            return {
+                'sucesso': False,
+                'erro': f'Erro na finalização completa: {str(e)}'
+            }
     
     def _buscar_endereco_viacep(self, cep: str) -> Dict:
         """

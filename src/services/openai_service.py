@@ -847,72 +847,38 @@ SEMPRE retorne JSON válido sem texto adicional."""
             client_cpf = client_data.get('cpf', '')
             client_email = client_data.get('email', '')
             
-            # ✅ OTIMIZADO: Prompt mais assertivo e específico
+            # ✅ NOVO PROMPT SEGURO: Apenas remover duplicatas, sem mexer em classificações
             prompt_analise = f"""
-Você é um ESPECIALISTA em limpeza de conversas WhatsApp. EXECUTE AS 4 REGRAS OBRIGATÓRIAS:
+Você é um ESPECIALISTA em limpeza de conversas WhatsApp. EXECUTE APENAS AS 3 REGRAS SEGURAS:
 
-🎯 **REGRA 1 - CLASSIFICAÇÃO IA→CORRETOR** (OBRIGATÓRIA):
-- "✅ *Dados do cliente coletados com sucesso!*" = sender="ia", receiver="corretor"
-- "🚀 Mensagem enviada ao cliente" = sender="ia", receiver="corretor"  
-- "✅ Iniciando contato com o cliente" = sender="ia", receiver="corretor"
-
-🎯 **REGRA 2 - NATURALIZAÇÃO MENUS** (OBRIGATÓRIA):
-- REMOVER: "(row_id: iniciar_fechamento)" → "Iniciar Fechamento Locação"
-- REMOVER: "(row_id: qualquer_codigo)" → texto natural apenas
-
-🎯 **REGRA 3 - DUPLICATAS** (OBRIGATÓRIA):
-- Mensagens IDÊNTICAS = REMOVER a segunda ocorrência
+ **REGRA 1 - DUPLICATAS** (OBRIGATÓRIA):
+- Mensagens com MESMO conteúdo = REMOVER segunda ocorrência
 - Conteúdo 90%+ similar = REMOVER duplicata
 - Seja AGRESSIVO na remoção de duplicatas
 
-🎯 **REGRA 4 - FLUXO PERDIDO** (OBRIGATÓRIA):
-- IA pede CPF → IA pede EMAIL = INSERIR resposta CPF do cliente
-- IA pede EMAIL → IA pede DATA = INSERIR resposta EMAIL do cliente
+ **REGRA 2 - MENSAGENS TÉCNICAS** (OBRIGATÓRIA):
+- REMOVER: "(row_id: iniciar_fechamento)"
+- REMOVER: "Menu selecionado: Iniciar Fechamento Locação"
+- REMOVER: Logs internos do sistema
 
-**REGRAS ESPECÍFICAS OBRIGATÓRIAS:**
+ **REGRA 3 - MENSAGENS VAZIAS** (OBRIGATÓRIA):
+- REMOVER: Mensagens sem conteúdo
+- REMOVER: Mensagens apenas com espaços
 
-1. **CPF SEMPRE = CLIENTE**: Qualquer mensagem contendo CPF (11 dígitos) deve ter sender="cliente"
-
-2. **REMOVER MENSAGEM DUPLICADA DE CPF**: 
-   - SEMPRE remover: "📄 Para prosseguir, preciso do seu CPF: (Somente números, exemplo: 12345678901)"
-   - MANTER apenas: "✅ Perfeito! Para prosseguir, preciso do seu CPF."
-
-3. **MENSAGENS IA→CORRETOR (sender="ia", receiver="corretor")**:
-   - "✅ Iniciando contato com o cliente..."
-   - "✅ Dados do cliente coletados com sucesso!"
-   - Qualquer mensagem começando com "✅ Dados do cliente"
-
-4. **CLASSIFICAÇÃO CORRETA**:
-   - Mensagem com CPF = sender="cliente"
-   - Mensagem "✅ Iniciando contato" = sender="ia", receiver="corretor"
-   - Mensagem "✅ Dados coletados" = sender="ia", receiver="corretor"
+❌ **NÃO MEXER EM** (PROIBIDO):
+- sender, receiver, sender_specific, receiver_specific
+- receiver_explicit, enhanced_method, telefone_destinatario
+- Estrutura das mensagens
+- Classificações existentes
+- CPF, email, dados do cliente
+- Metadados importantes
 
 **MENSAGENS DA CONVERSA:**
 {json.dumps(mensagens_para_analise, ensure_ascii=False, indent=2)}
 
-**DADOS DO CLIENTE (para detecção inteligente):**
+**DADOS DO CLIENTE (para referência apenas):**
 - CPF: {client_cpf}
 - Email: {client_email}
-
-**DETECÇÃO INTELIGENTE (REGRA CRÍTICA):**
-
-EXEMPLO DE PROBLEMA:
-1. msg_003: IA diz "preciso do seu CPF"
-2. msg_004: IA detalha "Para prosseguir, preciso do seu CPF: (números)"
-3. msg_005: IA diz "Digite seu e-mail"  ← PROBLEMA! Cliente não respondeu CPF!
-
-REGRA: Se IA pede CPF e próxima mensagem é IA pedindo EMAIL (sem resposta do cliente), então INSERIR:
-{{
-  "inserir_apos_index": [índice da mensagem que pede CPF],
-  "sender": "cliente", 
-  "content": "{client_cpf}",
-  "motivo": "Resposta de CPF perdida detectada"
-}}
-
-OUTROS PADRÕES:
-- IA pede CPF → IA pede EMAIL = FALTA resposta CPF
-- IA pede EMAIL → IA pede DATA = FALTA resposta EMAIL
-- IA pede DATA → IA pede CEP = FALTA resposta DATA
 
 **RESPONDA EM JSON:**
 {{
@@ -924,23 +890,9 @@ OUTROS PADRÕES:
       "novo_conteudo": "nova versão sem detalhes técnicos"
     }}
   ],
-  "mensagens_para_reclassificar": [
-    {{
-      "index": índice,
-      "novo_sender": "cliente|ia|corretor",
-      "novo_receiver": "ia|corretor|cliente",
-      "motivo": "classificação correta aplicada"
-    }}
-  ],
-  "mensagens_para_inserir": [
-    {{
-      "inserir_apos_index": índice,
-      "sender": "cliente",
-      "content": "resposta do cliente",
-      "motivo": "mensagem perdida detectada"
-    }}
-  ],
-  "justificativa": "explicação breve das mudanças"
+  "mensagens_para_reclassificar": [],  # SEMPRE VAZIO - NÃO CLASSIFICAR
+  "mensagens_para_inserir": [],  # SEMPRE VAZIO - NÃO INSERIR
+  "justificativa": "explicação breve das mudanças (apenas remoção de duplicatas e mensagens técnicas)"
 }}
 
 **REGRAS:**
@@ -1016,8 +968,9 @@ Seja PRECISO na detecção de fluxos quebrados."""
                 conversa_json
             )
 
-            # ✅ NOVO: Aplicar verificação final obrigatória
-            mensagens_verificadas = self._verificacao_final_obrigatoria(mensagens_limpas)
+            # ✅ DESABILITADO: Aplicar verificação final obrigatória
+            # mensagens_verificadas = self._verificacao_final_obrigatoria(mensagens_limpas)
+            mensagens_verificadas = mensagens_limpas  # Pular verificação para preservar classificações
             
             # ✅ NOVO: Gerar relatório de auditoria
             relatorio_auditoria = self._auditar_resultado_limpeza(
@@ -1128,15 +1081,15 @@ Seja PRECISO na detecção de fluxos quebrados."""
                     
                     logger.info(f"🔄 Reclassificada mensagem {i}: {reclass['sender']}→{reclass['receiver']} - {reclass['motivo']}")
                 
-                # ✅ NOVO: Detectar CPF e forçar classificação como cliente
-                content = mensagem_processada.get('content', '')
-                if re.search(r'\b\d{11}\b', content) and mensagem_processada.get('sender') != 'cliente':
-                    mensagem_processada['sender'] = 'cliente'
-                    mensagem_processada['sender_specific'] = 'cliente'
-                    mensagem_processada['receiver'] = 'ia'
-                    mensagem_processada['receiver_specific'] = 'ia'
-                    mensagem_processada['ai_auto_classified'] = True
-                    logger.info(f"🔄 AUTO-CLASSIFICAÇÃO: Mensagem {i} com CPF → cliente")
+                # ✅ DESABILITADO: Detectar CPF e forçar classificação como cliente
+                # content = mensagem_processada.get('content', '')
+                # if re.search(r'\b\d{11}\b', content) and mensagem_processada.get('sender') != 'cliente':
+                #     mensagem_processada['sender'] = 'cliente'
+                #     mensagem_processada['sender_specific'] = 'cliente'
+                #     mensagem_processada['receiver'] = 'ia'
+                #     mensagem_processada['receiver_specific'] = 'ia'
+                #     mensagem_processada['ai_auto_classified'] = True
+                #     logger.info(f"🔄 AUTO-CLASSIFICAÇÃO: Mensagem {i} com CPF → cliente")
                 
                 mensagens_limpas.append(mensagem_processada)
                 
@@ -1190,29 +1143,29 @@ Seja PRECISO na detecção de fluxos quebrados."""
         mensagens_para_reclassificar = []
         mensagens_para_inserir = []
         
-        # ✅ REGRA 1: CLASSIFICAÇÃO IA→CORRETOR
-        for i, msg in enumerate(mensagens_para_analise):
-            content = msg.get('content', '').strip()
-            sender = msg.get('sender', '')
-            
-            # Padrões específicos para reclassificação
-            padroes_ia_corretor = [
-                "✅ *Dados do cliente coletados com sucesso!*",
-                "🚀 Mensagem enviada ao cliente",
-                "✅ Dados do cliente coletados",
-                "✅ Iniciando contato com o cliente"
-            ]
-            
-            for padrao in padroes_ia_corretor:
-                if padrao in content and sender != 'corretor':
-                    mensagens_para_reclassificar.append({
-                        "index": i,
-                        "novo_sender": "ia",
-                        "novo_receiver": "corretor", 
-                        "motivo": f"Padrão IA→Corretor detectado: {padrao[:30]}..."
-                    })
-                    logger.info(f"🔄 REGRA 1: Reclassificando mensagem {i} para IA→Corretor")
-                    break
+        # ✅ DESABILITADO: REGRA 1: CLASSIFICAÇÃO IA→CORRETOR
+        # for i, msg in enumerate(mensagens_para_analise):
+        #     content = msg.get('content', '').strip()
+        #     sender = msg.get('sender', '')
+        #     
+        #     # Padrões específicos para reclassificação
+        #     padroes_ia_corretor = [
+        #         "✅ *Dados do cliente coletados com sucesso!*",
+        #         "🚀 Mensagem enviada ao cliente",
+        #         "✅ Dados do cliente coletados",
+        #         "✅ Iniciando contato com o cliente"
+        #     ]
+        #     
+        #     for padrao in padroes_ia_corretor:
+        #         if padrao in content and sender != 'corretor':
+        #             mensagens_para_reclassificar.append({
+        #                 "index": i,
+        #                 "novo_sender": "ia",
+        #                 "novo_receiver": "corretor", 
+        #                 "motivo": f"Padrão IA→Corretor detectado: {padrao[:30]}..."
+        #             })
+        #             logger.info(f"🔄 REGRA 1: Reclassificando mensagem {i} para IA→Corretor")
+        #             break
         
         # ✅ REGRA 2: NATURALIZAÇÃO DE MENUS
         for i, msg in enumerate(mensagens_para_analise):
@@ -1269,50 +1222,50 @@ Seja PRECISO na detecção de fluxos quebrados."""
                 else:
                     conteudos_vistos[chave] = i
         
-        # ✅ REGRA 4: FLUXO LÓGICO - Detectar mensagens perdidas
-        for i in range(len(mensagens_para_analise) - 1):
-            msg_atual = mensagens_para_analise[i]
-            msg_proxima = mensagens_para_analise[i + 1]
-            
-            content_atual = msg_atual.get('content', '').strip()
-            content_proxima = msg_proxima.get('content', '').strip()
-            sender_atual = msg_atual.get('sender', '')
-            sender_proxima = msg_proxima.get('sender', '')
-            
-            # Detectar padrão: IA pede CPF → IA pede EMAIL (falta resposta cliente)
-            if (sender_atual == 'ia' and sender_proxima == 'ia' and
-                'cpf' in content_atual.lower() and 'email' in content_proxima.lower()):
-                
-                # Inserir resposta de CPF perdida
-                mensagens_para_inserir.append({
-                    "inserir_apos_index": i,
-                    "sender": "cliente",
-                    "content": "12345678901",  # CPF padrão (será ajustado com dados reais)
-                    "motivo": "Resposta de CPF perdida detectada no fluxo"
-                })
-                logger.info(f"🔄 REGRA 4: Inserindo CPF perdido após mensagem {i}")
-            
-            # Detectar: IA pede EMAIL → IA pede DATA (falta resposta email)
-            elif (sender_atual == 'ia' and sender_proxima == 'ia' and
-                  'email' in content_atual.lower() and 'data' in content_proxima.lower()):
-                
-                mensagens_para_inserir.append({
-                    "inserir_apos_index": i,
-                    "sender": "cliente", 
-                    "content": "teste@exemplo.com",
-                    "motivo": "Resposta de email perdida detectada no fluxo"
-                })
-                logger.info(f"🔄 REGRA 4: Inserindo email perdido após mensagem {i}")
+        # ✅ DESABILITADO: REGRA 4: FLUXO LÓGICO - Detectar mensagens perdidas
+        # for i in range(len(mensagens_para_analise) - 1):
+        #     msg_atual = mensagens_para_analise[i]
+        #     msg_proxima = mensagens_para_analise[i + 1]
+        #     
+        #     content_atual = msg_atual.get('content', '').strip()
+        #     content_proxima = msg_proxima.get('content', '').strip()
+        #     sender_atual = msg_atual.get('sender', '')
+        #     sender_proxima = msg_proxima.get('sender', '')
+        #     
+        #     # Detectar padrão: IA pede CPF → IA pede EMAIL (falta resposta cliente)
+        #     if (sender_atual == 'ia' and sender_proxima == 'ia' and
+        #         'cpf' in content_atual.lower() and 'email' in content_proxima.lower()):
+        #         
+        #         # Inserir resposta de CPF perdida
+        #         mensagens_para_inserir.append({
+        #             "inserir_apos_index": i,
+        #             "sender": "cliente",
+        #             "content": "12345678901",  # CPF padrão (será ajustado com dados reais)
+        #             "motivo": "Resposta de CPF perdida detectada no fluxo"
+        #             })
+        #             logger.info(f"🔄 REGRA 4: Inserindo CPF perdido após mensagem {i}")
+        #     
+        #     # Detectar: IA pede EMAIL → IA pede DATA (falta resposta email)
+        #     elif (sender_atual == 'ia' and sender_proxima == 'ia' and
+        #           'email' in content_atual.lower() and 'data' in content_proxima.lower()):
+        #         
+        #         mensagens_para_inserir.append({
+        #             "inserir_apos_index": i,
+        #             "sender": "cliente", 
+        #             "content": "teste@exemplo.com",
+        #             "motivo": "Resposta de email perdida detectada no fluxo"
+        #             })
+        #             logger.info(f"🔄 REGRA 4: Inserindo email perdido após mensagem {i}")
         
         # Estatísticas do fallback
         total_modificacoes = (len(mensagens_para_remover) + len(mensagens_para_reformatar) + 
                             len(mensagens_para_reclassificar) + len(mensagens_para_inserir))
         
-        logger.info(f"🎯 FALLBACK RAG EXECUTADO:")
-        logger.info(f"   - Reclassificações: {len(mensagens_para_reclassificar)}")
+        logger.info(f"🎯 FALLBACK RAG EXECUTADO (CLASSIFICAÇÕES DESABILITADAS):")
+        logger.info(f"   - Reclassificações: {len(mensagens_para_reclassificar)} (DESABILITADAS)")
         logger.info(f"   - Naturalizações: {len(mensagens_para_reformatar)}")
         logger.info(f"   - Duplicatas removidas: {len(mensagens_para_remover)}")
-        logger.info(f"   - Mensagens inseridas: {len(mensagens_para_inserir)}")
+        logger.info(f"   - Mensagens inseridas: {len(mensagens_para_inserir)} (DESABILITADAS)")
         logger.info(f"   - Total modificações: {total_modificacoes}")
         
         return {
@@ -1321,9 +1274,9 @@ Seja PRECISO na detecção de fluxos quebrados."""
             "mensagens_para_reformatar": mensagens_para_reformatar,
             "mensagens_para_reclassificar": mensagens_para_reclassificar,
             "mensagens_para_inserir": mensagens_para_inserir,
-            "justificativa": f"Fallback RAG determinístico aplicado: {total_modificacoes} modificações executadas",
+            "justificativa": f"Fallback RAG aplicado (classificações desabilitadas): {total_modificacoes} modificações executadas",
             "fallback_aplicado": True,
-            "regras_executadas": ["classificacao_ia_corretor", "naturalizacao_menus", "remocao_duplicatas", "fluxo_logico"]
+            "regras_executadas": ["naturalizacao_menus", "remocao_duplicatas"]  # Removidas classificações
         }
 
     def _verificacao_final_obrigatoria(self, mensagens_limpas: List[Dict]) -> List[Dict]:

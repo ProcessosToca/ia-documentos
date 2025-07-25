@@ -206,9 +206,12 @@ class ConversationLogger:
             
             conversation = self.active_conversations[conversation_id]
             
-            # ✅ MELHORAR CLASSIFICAÇÃO V2 - Manter compatibilidade
+            # ✅ EXTRAIR telefone_destinatario dos metadados
+            telefone_destinatario = metadata.get("telefone_destinatario") if metadata else None
+            
+            # ✅ MELHORAR CLASSIFICAÇÃO V2 - Com telefone
             specific_sender, specific_receiver = self._classify_interaction_v2(
-                sender, conversation
+                sender, conversation, telefone_destinatario
             )
             
             # ✅ ESTRUTURA DE MENSAGEM MELHORADA V2
@@ -263,20 +266,29 @@ class ConversationLogger:
             logger.error(f"❌ Erro ao registrar mensagem: {str(e)}")
             return False
     
-    def _classify_interaction_v2(self, original_sender: str, conversation: Dict) -> tuple:
+    def _classify_interaction_v2(self, original_sender: str, conversation: Dict, telefone_destinatario: str = None) -> tuple:
         """
         ✅ NOVO V2: Classifica de forma específica quem está falando com quem
         
         Args:
             original_sender (str): Sender original do sistema
             conversation (Dict): Dados da conversa
+            telefone_destinatario (str): Telefone do destinatário para classificação automática (opcional)
             
         Returns:
             tuple: (sender_specific, receiver_specific)
         """
+        # ✅ NOVA FUNCIONALIDADE: Priorizar classificação por telefone
+        if telefone_destinatario and original_sender == "ia":
+            # Verificar se é corretor ou cliente pelo telefone
+            if self._is_corretor_phone(telefone_destinatario):
+                return ("ia", "corretor")
+            else:
+                return ("ia", "cliente")
+        
         current_phase = conversation["conversation_info"]["current_phase"]
         
-        # Mapeamento inteligente baseado no contexto
+        # Mapeamento inteligente baseado no contexto (lógica original)
         if original_sender in ["user"]:
             if current_phase == "ia_corretor":
                 return ("corretor", "ia")
@@ -629,7 +641,7 @@ class ConversationLogger:
             logger.error(f"❌ Erro ao adicionar telefone relacionado: {e}")
             return False
 
-    def add_message_enhanced(self, conversation_id: str, sender: str, receiver: str, content: str, phase: str = None) -> bool:
+    def add_message_enhanced(self, conversation_id: str, sender: str, receiver: str, content: str, phase: str = None, telefone_destinatario: str = None) -> bool:
         """
         ✅ MÉTODO PRINCIPAL: Registra mensagem com classificação específica
         
@@ -639,11 +651,20 @@ class ConversationLogger:
             receiver (str): Quem recebe ("ia", "corretor", "cliente") 
             content (str): Conteúdo da mensagem
             phase (str): Fase específica (opcional)
+            telefone_destinatario (str): Telefone do destinatário para classificação automática (opcional)
             
         Returns:
             bool: True se adicionou com sucesso
         """
         try:
+            # ✅ NOVA FUNCIONALIDADE: Classificação automática por telefone
+            if telefone_destinatario and sender == "ia":
+                # Verificar se é corretor ou cliente pelo telefone
+                if self._is_corretor_phone(telefone_destinatario):
+                    receiver = "corretor"
+                else:
+                    receiver = "cliente"
+            
             # Se fase especificada, fazer transição se necessário
             if phase and conversation_id in self.active_conversations:
                 current_phase = self.active_conversations[conversation_id]["conversation_info"]["current_phase"]
@@ -653,7 +674,8 @@ class ConversationLogger:
             # Usar log_message com sender específico
             metadata = {
                 "receiver_explicit": receiver,
-                "enhanced_method": True
+                "enhanced_method": True,
+                "telefone_destinatario": telefone_destinatario  # Para auditoria
             }
             
             return self.log_message(conversation_id, sender, content, "text", metadata)
@@ -661,6 +683,17 @@ class ConversationLogger:
         except Exception as e:
             logger.error(f"❌ Erro no add_message_enhanced: {str(e)}")
             return False
+
+    def _is_corretor_phone(self, telefone: str) -> bool:
+        """
+        ✅ NOVA FUNÇÃO: Verifica se telefone é de corretor
+        """
+        # Lista de telefones de corretores
+        corretores = [
+            "5514997751850",  # Vinicius Garcia da Silva
+            # Adicionar outros corretores aqui conforme necessário
+        ]
+        return telefone in corretores
     
     def get_active_conversation_id(self, phone_number: str) -> Optional[str]:
         """
@@ -706,10 +739,45 @@ class ConversationLogger:
                 conversation = self.active_conversations[conversation_id]
                 logger.info(f"📋 Conversa encontrada na memória: {conversation_id}")
             else:
-                # Buscar no arquivo (finalizadas ou em_andamento)
-                conversation = self._carregar_conversa_do_arquivo(conversation_id)
-                if conversation:
-                    logger.info(f"📁 Conversa carregada do arquivo: {conversation_id}")
+                # ✅ NOVO: Buscar em AMBAS as pastas e usar a mais completa
+                conversation_finalizadas = None
+                conversation_em_andamento = None
+                
+                # Buscar em finalizadas
+                finalizadas_path = self.base_path / "finalizadas" / f"{conversation_id}.json"
+                if finalizadas_path.exists():
+                    try:
+                        with open(finalizadas_path, 'r', encoding='utf-8') as f:
+                            conversation_finalizadas = json.load(f)
+                    except Exception as e:
+                        logger.warning(f"⚠️ Erro ao carregar de finalizadas: {e}")
+                
+                # Buscar em em_andamento
+                em_andamento_path = self.base_path / "em_andamento" / f"{conversation_id}.json"
+                if em_andamento_path.exists():
+                    try:
+                        with open(em_andamento_path, 'r', encoding='utf-8') as f:
+                            conversation_em_andamento = json.load(f)
+                    except Exception as e:
+                        logger.warning(f"⚠️ Erro ao carregar de em_andamento: {e}")
+                
+                # ✅ NOVO: Usar a conversa com mais mensagens
+                if conversation_finalizadas and conversation_em_andamento:
+                    msgs_finalizadas = len(conversation_finalizadas.get('messages', []))
+                    msgs_em_andamento = len(conversation_em_andamento.get('messages', []))
+                    
+                    if msgs_finalizadas >= msgs_em_andamento:
+                        conversation = conversation_finalizadas
+                        logger.info(f"📁 Usando conversa de finalizadas: {msgs_finalizadas} mensagens")
+                    else:
+                        conversation = conversation_em_andamento
+                        logger.info(f"📁 Usando conversa de em_andamento: {msgs_em_andamento} mensagens")
+                elif conversation_finalizadas:
+                    conversation = conversation_finalizadas
+                    logger.info(f"📁 Conversa carregada de finalizadas: {len(conversation.get('messages', []))} mensagens")
+                elif conversation_em_andamento:
+                    conversation = conversation_em_andamento
+                    logger.info(f"📁 Conversa carregada de em_andamento: {len(conversation.get('messages', []))} mensagens")
             
             if not conversation:
                 return {
@@ -895,13 +963,19 @@ class ConversationLogger:
             finalizadas_path = self.base_path / "finalizadas" / f"{conversation_id}.json"
             if finalizadas_path.exists():
                 with open(finalizadas_path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    conversation = json.load(f)
+                    # ✅ NOVO: Manter conversa na memória após carregar
+                    self.active_conversations[conversation_id] = conversation
+                    return conversation
             
             # Buscar em em_andamento
             em_andamento_path = self.base_path / "em_andamento" / f"{conversation_id}.json"
             if em_andamento_path.exists():
                 with open(em_andamento_path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    conversation = json.load(f)
+                    # ✅ NOVO: Manter conversa na memória após carregar
+                    self.active_conversations[conversation_id] = conversation
+                    return conversation
             
             return None
             
@@ -1087,17 +1161,28 @@ class ConversationLogger:
                 if current_phase and current_phase in conversa_encontrada['conversation_phases']['phases']:
                     conversa_encontrada['conversation_phases']['phases'][current_phase]['ended_at'] = datetime.now().isoformat()
             
-            # Salvar na pasta finalizadas
-            finalizadas_path = self.base_path / "finalizadas"
-            finalizadas_path.mkdir(exist_ok=True)
-            
-            arquivo_destino = finalizadas_path / arquivo_origem.name
-            
-            with open(arquivo_destino, 'w', encoding='utf-8') as f:
-                json.dump(conversa_encontrada, f, ensure_ascii=False, indent=2)
-            
-            # Remover arquivo original de em_andamento
-            arquivo_origem.unlink()
+            # ✅ NOVO: Verificar se conversa está completa antes de mover
+            if 'messages' in conversa_encontrada and len(conversa_encontrada['messages']) > 0:
+                # Salvar na pasta finalizadas
+                finalizadas_path = self.base_path / "finalizadas"
+                finalizadas_path.mkdir(exist_ok=True)
+                
+                arquivo_destino = finalizadas_path / arquivo_origem.name
+                
+                with open(arquivo_destino, 'w', encoding='utf-8') as f:
+                    json.dump(conversa_encontrada, f, ensure_ascii=False, indent=2)
+                
+                # Remover arquivo original de em_andamento
+                arquivo_origem.unlink()
+                
+                logger.info(f"✅ Conversa movida para finalizadas: {arquivo_origem.name} ({len(conversa_encontrada['messages'])} mensagens)")
+            else:
+                logger.error(f"❌ Conversa vazia ou sem mensagens, não movendo: {arquivo_origem.name}")
+                return {
+                    'sucesso': False,
+                    'erro': f'Conversa vazia, não foi finalizada: {conversation_id}',
+                    'conversation_id': conversation_id
+                }
             
             logger.info(f"✅ Conversa finalizada e movida: {conversation_id} (telefone: {telefone})")
             
